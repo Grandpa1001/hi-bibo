@@ -134,10 +134,26 @@ Oddech nr: {brain['breath_count'] + 1}
         print("ERROR: No ANTHROPIC_API_KEY", file=sys.stderr)
         sys.exit(1)
 
-    client = anthropic.Anthropic(api_key=api_key)
+    # Use Hermes's Anthropic client builder — it auto-detects OAuth tokens
+    # (sk-ant-oat*) vs regular API keys (sk-ant-api*) and applies the correct
+    # auth headers (Bearer vs x-api-key) plus the Claude-Code identity headers
+    # OAuth requires. Falling back to raw anthropic.Anthropic(api_key=...) would
+    # send OAuth tokens as x-api-key and get 401.
+    try:
+        sys.path.insert(0, "/opt/hermes")
+        from agent.anthropic_adapter import build_anthropic_client
+        client = build_anthropic_client(api_key, base_url="https://api.anthropic.com")
+    except Exception as _hermes_import_err:
+        # Fallback: plain SDK client (works for regular API keys, fails for OAuth)
+        print(
+            f"WARN: could not use Hermes anthropic adapter ({_hermes_import_err}); "
+            "falling back to plain SDK client (OAuth tokens will fail)",
+            file=sys.stderr,
+        )
+        client = anthropic.Anthropic(api_key=api_key)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-5",
         max_tokens=2000,
         system=prompt,
         messages=[
