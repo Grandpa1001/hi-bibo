@@ -1,5 +1,6 @@
 {
   "version": "1.0",
+  "debug_mode": false,
   "last_updated": null,
   "breath_count": 0,
   "phase": "adaptation",
