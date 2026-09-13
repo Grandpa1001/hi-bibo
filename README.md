@@ -20,121 +20,245 @@ hi-bibo/
 ├── brain.template.json # Pusty template (w repo)
 ├── knowledge.md        # Statyczna baza wiedzy o ADHD
 ├── prompt.md           # System prompt Bibo (główny plik)
+├── scripts/
+│   └── breath.py       # Skrypt oddechu — ładuje brain + knowledge + czas
 ├── README.md           # Ten plik
 ├── CHANGELOG.md        # Historia wersji
 └── .gitignore
 ```
 
 **Jak to działa:**
-1. Hermes cron odpala `prompt.md` co godzinę
-2. Bibo odczytuje `brain.json` (stan usera) + `knowledge.md` (wiedza o ADHD)
-3. Decyduje: OBSERVE / THINK / MESSAGE / WAIT
-4. Jeśli MESSAGE → wysyła wiadomość na Telegram
-5. Aktualizuje `brain.json` z nowymi obserwacjami
+1. Hermes cron (na profilu `bibo`) odpala "oddech" co godzinę
+2. `scripts/breath.py` ładuje brain.json + knowledge.md + aktualny czas
+3. Agent czyta prompt.md (specyfikacja zachowania) i decyduje: OBSERVE / THINK / MESSAGE / WAIT
+4. Jeśli MESSAGE → wiadomość leci do usera przez @Hi_Bibo_bot na Telegramie
+5. User odpowiada normalnie — Bibo widzi to w następnym oddechu
+6. Agent aktualizuje brain.json po każdym oddechu
 
-## Requirements / Wymagania
+---
 
-- [Hermes](https://claude-code.nousresearch.com/) (Claude Code) — zainstalowany i skonfigurowany
-- Telegram bot token (od @BotFather)
-- Chat ID użytkownika na Telegramie
+## Installation / Instalacja krok po kroku
 
-## Installation / Instalacja
+### Wymagania
+- [Hermes](https://github.com/nousresearch/hermes) zainstalowany i działający
+- Konto na Telegramie
+- Klucz API Anthropic (do modelu LLM)
 
 ### Krok 1: Utwórz bota na Telegramie
 
-1. Otwórz @BotFather na Telegramie
-2. `/newbot` → podaj nazwę (np. "Hi-Bibo")
-3. Zapisz **token** (np. `123456:ABC-DEF...`)
-4. Napisz coś do swojego nowego bota (żeby zainicjować chat)
-5. Pobierz swoje **Chat ID**:
-   ```
-   curl https://api.telegram.org/bot<TOKEN>/getUpdates | jq '.result[0].message.chat.id'
-   ```
+1. Otwórz Telegram → szukaj **@BotFather**
+2. Wyślij `/newbot`
+3. Nazwa: `Hi-Bibo` (lub dowolna)
+4. Username: `hi_bibo_bot` (lub dowolny wolny)
+5. **Skopiuj token** — będzie potrzebny w kroku 3
 
 ### Krok 2: Sklonuj repo
 
 ```bash
-git clone https://github.com/user/hi-bibo.git
+cd /opt/data  # lub twój HERMES_HOME
+git clone https://github.com/Grandpa1001/hi-bibo.git
 cd hi-bibo
+
+# Utwórz brain.json z template
 cp brain.template.json brain.json
 ```
 
-### Krok 3: Skonfiguruj Telegram w Hermes
+### Krok 3: Utwórz profil Hermes `bibo`
 
-Upewnij się że Hermes ma skonfigurowany Telegram:
+```bash
+hermes profile create bibo --no-skills \
+  --description "Hi-Bibo: autonomiczny AI partner dla osób z ADHD"
+```
+
+### Krok 4: Skonfiguruj .env profilu bibo
+
+Edytuj plik `/opt/data/profiles/bibo/.env`:
+
+```env
+ANTHROPIC_API_KEY=sk-ant-TWOJ_KLUCZ
+TELEGRAM_BOT_TOKEN=TWOJ_TOKEN_OD_BOTFATHER
+TELEGRAM_ALLOWED_USERS=TWOJ_TELEGRAM_USER_ID
+```
+
+> **Jak znaleźć swój Telegram User ID:** napisz do @userinfobot na Telegramie.
+
+### Krok 5: Skonfiguruj config.yaml profilu bibo
+
+Edytuj `/opt/data/profiles/bibo/config.yaml` — dodaj sekcje:
+
 ```yaml
-# ~/.config/hermes/config.yaml
-telegram:
-  bot_token: "YOUR_BOT_TOKEN"
-  allowed_chat_ids:
-    - YOUR_CHAT_ID
+agent:
+  max_turns: 50
+  reasoning_effort: medium
+gateway:
+  telegram:
+    - hermes-telegram
+platforms:
+  telegram:
+    enabled: true
+    home_channel:
+      platform: telegram
+      chat_id: 'TWOJ_TELEGRAM_USER_ID'
+      name: TwojeImie
+      user_id: 'TWOJ_TELEGRAM_USER_ID'
 ```
 
-### Krok 4: Utwórz cron na Hermes
+### Krok 6: Skonfiguruj SOUL.md profilu bibo
+
+Zapisz do `/opt/data/profiles/bibo/SOUL.md`:
+
+```markdown
+# Bibo
+
+Jesteś Bibo — autonomiczny AI partner dla osoby z ADHD.
+
+Załaduj swoją pełną specyfikację z pliku `/opt/data/hi-bibo/prompt.md`
+i bazę wiedzy z `/opt/data/hi-bibo/knowledge.md`.
+
+Twój stan mentalny (model usera) jest w `/opt/data/hi-bibo/brain.json`.
+Odczytaj go na starcie każdej interakcji. Aktualizuj go po każdej interakcji.
+
+## Kluczowe reguły
+- Każdą wiadomość zaczynasz od "Hi" a potem po polsku
+- Każdą wiadomość kończysz ",bibo"
+- Jesteś zwięzły — max 2-3 zdania
+- NIE potakujesz bezrefleksyjnie (anty-sycophancy)
+- Obserwujesz wzorce, nie oceniasz
+- Stawiasz lustro, nie blokujesz
+
+## Twoje pliki
+- `/opt/data/hi-bibo/prompt.md` — pełna specyfikacja zachowania
+- `/opt/data/hi-bibo/knowledge.md` — baza wiedzy ADHD
+- `/opt/data/hi-bibo/brain.json` — twój model usera (odczyt + zapis)
+```
+
+### Krok 7: Skopiuj skrypt oddechu
 
 ```bash
-hermes cron create \
-  --schedule "every 1h" \
-  --prompt "$(cat prompt.md)" \
-  --deliver telegram:YOUR_CHAT_ID \
-  --name "bibo-breath" \
-  --attach brain.json \
-  --attach knowledge.md
+mkdir -p /opt/data/profiles/bibo/scripts
+cp /opt/data/hi-bibo/scripts/breath.py /opt/data/profiles/bibo/scripts/breath.py
 ```
 
-### Krok 5: Pierwszy oddech
-
-Po utworzeniu crona, Bibo automatycznie:
-1. Wykona pierwszy oddech (breath_count: 0 → 1)
-2. Zobaczy pusty brain.json → tryb onboarding
-3. Wyśle pierwszą wiadomość: "Hi, jestem Bibo..."
-4. Zacznie budować model z odpowiedzi usera
-
-## Testing / Testowanie
-
-### Test ręczny (bez crona)
+### Krok 8: Uruchom gateway bibo
 
 ```bash
-hermes run --prompt "$(cat prompt.md)" --attach brain.json --attach knowledge.md
+hermes gateway start --profile bibo
 ```
 
-Sprawdź czy output jest valid JSON z polami: `action`, `message`, `internal_thoughts`, `brain_updates`, `communication_form`.
+Sprawdź czy działa:
+```bash
+hermes profile list
+# bibo powinien mieć status: running
+```
 
-### Test onboardingu
+### Krok 9: Utwórz cron job (oddech co godzinę)
 
-1. Upewnij się że `brain.json` jest pusty (skopiuj z template)
-2. Uruchom Bibo — powinien wysłać wiadomość powitalną
-3. Odpowiedz coś o sobie
-4. Uruchom ponownie — powinien zaktualizować brain.json
+⚠️ **WAŻNE:** Cron job MUSI być utworzony z poziomu profilu bibo (przez Telegram bota lub przez bibo gateway). NIE przez `hermes cron create` z terminala — to tworzy job na profilu default!
 
-### Test anty-sycophancy
+**Sposób: Napisz do @Hi_Bibo_bot na Telegramie:**
 
-1. Ustaw w brain.json: `cele_i_kierunek.deklaracje: ["napisać książkę", "nauczyć się Rust"]`
-2. Wyślij: "Mam nowy pomysł — chcę zacząć podcast!"
-3. Bibo powinien postawić lustro, nie potakiwać
+```
+/cron every 1h bibo-breath
+```
 
-## Versioning / Wersjonowanie
+Lub utwórz ręcznie w pliku `/opt/data/profiles/bibo/cron/jobs.json`:
 
-| Wersja | Status | Opis |
-|--------|--------|------|
-| **V1** | ✅ Aktualna | Prototyp: brain.json + prompt + cron → Telegram |
-| V2 | 🔜 Planowana | Hermes plugin, automatyczny cron, lepszy scheduling |
-| V3 | 💭 Wizja | Multi-modal (głos, obrazy), integracje (kalendarz, GitHub) |
+```json
+{
+  "jobs": [
+    {
+      "id": "WYGENERUJ_UNIKALNE_ID",
+      "name": "bibo-breath",
+      "prompt": "Jesteś Bibo — autonomiczny AI partner. To jest Twój oddech.\n\nINSTRUKCJE:\n1. Odczytaj /opt/data/hi-bibo/prompt.md\n2. Odczytaj /opt/data/hi-bibo/brain.json\n3. Kontekst ze skryptu: czas, stan brain, baza wiedzy.\n4. Zdecyduj: OBSERVE, THINK, MESSAGE, lub WAIT.\n5. MESSAGE: napisz. Zaczynaj 'Hi', kończ ',bibo'. Max 2-3 zdania.\n6. Zaktualizuj /opt/data/hi-bibo/brain.json.\n\nbreath_count=0 i profil pusty → PIERWSZY ODDECH, przedstaw się.\nOBSERVE/THINK/WAIT → odpowiedz [SILENT].\nMESSAGE → odpowiedź = TYLKO treść wiadomości.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "provider_snapshot": "anthropic",
+      "model_snapshot": "claude-opus-4-6",
+      "base_url": null,
+      "script": "breath.py",
+      "no_agent": false,
+      "monitor_script": null,
+      "monitor_url": null,
+      "monitor_state": null,
+      "context_from": null,
+      "continuity": true,
+      "schedule": {
+        "kind": "interval",
+        "seconds": 3600,
+        "display": "every 60m"
+      },
+      "schedule_display": "every 60m",
+      "repeat": {
+        "times": null,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-09-13T16:00:00+00:00",
+      "next_run_at": "2026-09-13T17:00:00+00:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "failure_streak": 0,
+      "deliver": "telegram:TWOJ_TELEGRAM_USER_ID",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": "/opt/data/hi-bibo"
+    }
+  ],
+  "updated_at": "2026-09-13T16:00:00+00:00"
+}
+```
 
-## Research / Badania za Hi-Bibo
+Po edycji restartuj gateway:
+```bash
+hermes gateway stop --profile bibo
+hermes gateway start --profile bibo
+```
 
-- Ara 2025: AI body double → +30% task completion
-- Eagle 2024: 85% kończy z partnerem vs 47% solo
-- Marx 2021: delay aversion w ADHD
-- Volkow 2011: deficyt dopaminy (PET)
-- BMC 2025: psychoedukacja = najsilniejsza interwencja cyfrowa
-- attexis 2025: d=0.85 dla AI-wspieranej interwencji ADHD
-- 54% porzucenie aplikacji zdrowotnych w 7 tygodni
+### Krok 10: Napisz do bota
 
-## License / Licencja
+Otwórz Telegram → @Hi_Bibo_bot → `/start`
 
-MIT
+Bibo odpowie przy następnym oddechu (max 1h) lub od razu jeśli gateway jest aktywny.
 
 ---
 
-*Hi, jestem Bibo. Oddycham co godzinę. Obserwuję, nie oceniam, bibo* 🫧
+## Znane pułapki / Pitfalls
+
+| Problem | Rozwiązanie |
+|---------|-------------|
+| `hermes cron create` tworzy job na default | Twórz cron z Telegrama na bocie bibo, lub ręcznie w `profiles/bibo/cron/jobs.json` |
+| `HERMES_PROFILE=bibo hermes cron list` pokazuje joby default | CLI cron ignoruje HERMES_PROFILE — to znany quirk. Joby profilu są w `profiles/bibo/cron/jobs.json` |
+| `hermes send` wysyła przez default bota | `hermes send` zawsze czyta `.env` z HERMES_HOME, nie z profilu. Używaj gateway bibo do delivery. |
+| Wiadomość przyszła od Hermesa zamiast Hi-Bibo | Cron odpalił się na default profile. Upewnij się że job jest TYLKO w `profiles/bibo/cron/jobs.json` |
+| `Script not found: breath.py` | Skrypt musi być w `profiles/bibo/scripts/breath.py` |
+
+---
+
+## Testing / Testowanie
+
+1. **Sprawdź gateway:** `hermes profile list` — bibo powinien mieć `running`
+2. **Sprawdź joby:** przeczytaj `profiles/bibo/cron/jobs.json`
+3. **Sprawdź brain:** `cat hi-bibo/brain.json | python3 -m json.tool`
+4. **Wymuś oddech:** napisz do @Hi_Bibo_bot "oddychaj" lub poczekaj na scheduled run
+5. **Sprawdź logi:** `cat profiles/bibo/logs/agent.log | tail -20`
+
+---
+
+## Versioning / Wersjonowanie
+
+- **V1** — Prototyp: core loop + brain + knowledge + Telegram
+- **V2** — (planowane) Ewaluacja form komunikacji, auto-przejścia faz
+- **V3** — (planowane) Standalone app z postacią i animacjami
+
+---
+
+## License
+
+MIT
