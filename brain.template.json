@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "last_updated": null,
+  "breath_count": 0,
+  "phase": "adaptation",
+  "profil": {
+    "description": "Kim jest user - wiek, praca, sytuacja, specyfika ADHD",
+    "data": {},
+    "confidence": 0.0,
+    "last_updated": null
+  },
+  "preferencje_kontaktu": {
+    "description": "Jak lubi komunikację, kiedy, jaki ton, co go irytuje",
+    "data": {},
+    "confidence": 0.0,
+    "last_updated": null
+  },
+  "nawyki": {
+    "description": "Powtarzalne wzorce - kiedy aktywny, kiedy znika, cykle",
+    "data": {},
+    "confidence": 0.0,
+    "last_updated": null
+  },
+  "zachowania_biezace": {
+    "description": "Co robi teraz, energia, ton, temat ostatnich rozmów",
+    "data": {},
+    "entries": [],
+    "last_updated": null
+  },
+  "problemy_stale": {
+    "description": "Chroniczne wyzwania - prokrastynacja, decision paralysis, RSD",
+    "data": {},
+    "confidence": 0.0,
+    "last_updated": null
+  },
+  "problemy_aktualne": {
+    "description": "Bieżące blockery, deadliny, stresy",
+    "data": {},
+    "entries": [],
+    "last_updated": null
+  },
+  "cele_i_kierunek": {
+    "description": "Co user chce osiągnąć vs co faktycznie robi",
+    "deklaracje": [],
+    "rzeczywistosc": [],
+    "last_updated": null
+  },
+  "co_dziala": {
+    "description": "Które formy Bibo zadziałały, które nie, kiedy",
+    "skuteczne": [],
+    "nieskuteczne": [],
+    "last_updated": null
+  },
+  "charakter_bibo": {
+    "description": "6 parametrów ewoluujących - Bibo buduje swoją tożsamość z interakcji",
+    "bezposredniosc": 0.6,
+    "cierpliwosc": 0.7,
+    "humor": 0.4,
+    "prowokacyjnosc": 0.3,
+    "emocjonalnosc": 0.5,
+    "ciekawosc": 0.8,
+    "last_updated": null
+  }
+}
