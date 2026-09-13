@@ -129,6 +129,11 @@ HERMES_HOME=/opt/data/profiles/bibo hermes config set plugins.enabled '["bibo-cl
 
 # Wycisz systemową notyfikację "💾 Self-improvement review" (nie od Bibo):
 HERMES_HOME=/opt/data/profiles/bibo hermes config set display.memory_notifications off
+
+# Wyłącz cały mechanizm background_review — Bibo pracuje wyłącznie na
+# własnym brain.json + thoughts.log, wbudowana pamięć Hermesa nie jest
+# potrzebna i tylko generuje szum + koszty API w tle.
+HERMES_HOME=/opt/data/profiles/bibo hermes config set auxiliary.background_review.enabled false
 ```
 
 **Sterowanie filtrem myśli:** pole `debug_mode` w `brain.json`:
