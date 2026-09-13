@@ -105,32 +105,35 @@ platforms:
 
 ### Krok 6: Skonfiguruj SOUL.md profilu bibo
 
-Zapisz do `/opt/data/profiles/bibo/SOUL.md`:
+Skopiuj gotowy plik z `install/`:
 
-```markdown
-# Bibo
-
-Jesteś Bibo — autonomiczny AI partner dla osoby z ADHD.
-
-Załaduj swoją pełną specyfikację z pliku `/opt/data/hi-bibo/prompt.md`
-i bazę wiedzy z `/opt/data/hi-bibo/knowledge.md`.
-
-Twój stan mentalny (model usera) jest w `/opt/data/hi-bibo/brain.json`.
-Odczytaj go na starcie każdej interakcji. Aktualizuj go po każdej interakcji.
-
-## Kluczowe reguły
-- Każdą wiadomość zaczynasz od "Hi" a potem po polsku
-- Każdą wiadomość kończysz ",bibo"
-- Jesteś zwięzły — max 2-3 zdania
-- NIE potakujesz bezrefleksyjnie (anty-sycophancy)
-- Obserwujesz wzorce, nie oceniasz
-- Stawiasz lustro, nie blokujesz
-
-## Twoje pliki
-- `/opt/data/hi-bibo/prompt.md` — pełna specyfikacja zachowania
-- `/opt/data/hi-bibo/knowledge.md` — baza wiedzy ADHD
-- `/opt/data/hi-bibo/brain.json` — twój model usera (odczyt + zapis)
+```bash
+cp /opt/data/hi-bibo/install/SOUL.md /opt/data/profiles/bibo/SOUL.md
 ```
+
+SOUL.md definiuje charakter Bibo, reguły komunikacji (Hi..., ,bibo) i zakaz wysyłania przemyśleń do usera.
+
+### Krok 6b: Zainstaluj plugin `bibo-clean-output`
+
+Plugin zapewnia dwie rzeczy:
+1. **Filtruje myśli Bibo** — usuwa wszystko po pierwszym `bibo` (przemyślenia po tool_call nie lecą do usera, tylko do `logs/thoughts.log`)
+2. **Pilnuje struktury brain.json** — jeśli Bibo w oddechu wyrzuci jakiś top-level klucz, plugin przywraca go z `brain.template.json`
+
+Instalacja:
+```bash
+mkdir -p /opt/data/profiles/bibo/plugins
+cp -r /opt/data/hi-bibo/install/plugins/bibo-clean-output /opt/data/profiles/bibo/plugins/
+
+# Włącz plugin w config.yaml profilu bibo:
+HERMES_HOME=/opt/data/profiles/bibo hermes config set plugins.enabled '["bibo-clean-output"]'
+
+# Wycisz systemową notyfikację "💾 Self-improvement review" (nie od Bibo):
+HERMES_HOME=/opt/data/profiles/bibo hermes config set display.memory_notifications off
+```
+
+**Sterowanie filtrem myśli:** pole `debug_mode` w `brain.json`:
+- `false` (produkcja) — user widzi tylko wiadomość Bibo, przemyślenia lądują w `logs/thoughts.log`
+- `true` (debug) — plugin nic nie tnie, user widzi wszystko
 
 ### Krok 7: Skopiuj skrypt oddechu
 
