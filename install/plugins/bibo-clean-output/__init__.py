@@ -252,9 +252,116 @@ def _on_post_tool_call(
 
 
 # ---------------------------------------------------------------------------
+# /bibo-profile — slash command showing the agent's self-state
+# ---------------------------------------------------------------------------
+
+# Character parameter descriptions used in the profile card.
+_CHAR_DESCRIPTIONS = {
+    "bezposredniosc": "bezpośredniość — jak wprost formułuje obserwacje",
+    "cierpliwosc": "cierpliwość — jak długo czeka na Twoje tempo",
+    "humor": "humor — ile luzu w tonie",
+    "prowokacyjnosc": "prowokacyjność — jak mocno stawia lustro",
+    "emocjonalnosc": "emocjonalność — ile pozwala sobie na ton uczuciowy",
+    "ciekawosc": "ciekawość — jak głęboko drąży to co mówisz",
+}
+
+_PHASE_DESCRIPTIONS = {
+    "adaptation": "adaptacja — obserwuje, buduje model, mało pisze",
+    "partnership": "partnerstwo — inicjuje, konfrontuje, aktywny",
+    "silence": "cisza — user zniknął, tylko sygnały życia",
+}
+
+
+def _bar(value: float, width: int = 10) -> str:
+    """Render a 0-1 value as a text bar. Handles non-numeric input gracefully."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return "?" * width
+    v = max(0.0, min(1.0, v))
+    filled = int(round(v * width))
+    return "█" * filled + "░" * (width - filled)
+
+
+def _handle_bibo_profile(raw_args: str) -> Optional[str]:
+    """Render Bibo's self-state as a compact card.
+
+    Shows ONLY data about the agent itself (phase, breath count, character
+    parameters, what forms of communication worked/didn't). Does NOT include
+    anything about the user (profile / preferences / habits stay private and
+    are not surfaced through this command — Kamil asked for 'jakiego bibo
+    stworzyliśmy', not for a summary of himself).
+    """
+    try:
+        with open(BRAIN_PATH, "r", encoding="utf-8") as f:
+            brain = json.load(f)
+    except (OSError, ValueError) as exc:
+        return f"❌ Nie mogę odczytać brain.json: {exc}"
+
+    lines = ["🫧 *Bibo — karta partnera*", ""]
+
+    phase = brain.get("phase", "?")
+    phase_desc = _PHASE_DESCRIPTIONS.get(phase, phase)
+    lines.append(f"*Faza:* {phase_desc}")
+
+    breath = brain.get("breath_count", 0)
+    lines.append(f"*Oddechy:* {breath}")
+
+    last_updated = brain.get("last_updated") or "—"
+    lines.append(f"*Ostatnia aktualizacja:* {last_updated}")
+
+    debug = brain.get("debug_mode", False)
+    lines.append(f"*Tryb debug:* {'włączony (myśli lecą do Ciebie)' if debug else 'wyłączony'}")
+
+    lines.append("")
+    lines.append("*Charakter (ewoluuje z rozmowy):*")
+    char = brain.get("charakter_bibo") or {}
+    for key, desc in _CHAR_DESCRIPTIONS.items():
+        val = char.get(key)
+        bar = _bar(val)
+        if isinstance(val, (int, float)):
+            val_str = f"{val:.2f}"
+        else:
+            val_str = "?"
+        lines.append(f"  `{bar}` {val_str}  {desc}")
+
+    co_dziala = brain.get("co_dziala") or {}
+    skuteczne = co_dziala.get("skuteczne") or []
+    nieskuteczne = co_dziala.get("nieskuteczne") or []
+
+    lines.append("")
+    lines.append(f"*Co Bibo już wie że na Ciebie działa* ({len(skuteczne)}):")
+    if skuteczne:
+        for item in skuteczne:
+            lines.append(f"  ✓ {item}")
+    else:
+        lines.append("  — jeszcze nic potwierdzonego —")
+
+    lines.append("")
+    lines.append(f"*Co się nie sprawdziło* ({len(nieskuteczne)}):")
+    if nieskuteczne:
+        for item in nieskuteczne:
+            lines.append(f"  ✗ {item}")
+    else:
+        lines.append("  — jeszcze nic negatywnego —")
+
+    lines.append("")
+    lines.append(
+        f"_Dane z {BRAIN_PATH}. Nic tu nie idzie do modelu językowego — czysty odczyt pliku._"
+    )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
 def register(ctx) -> None:
     ctx.register_hook("transform_llm_output", _on_transform_llm_output)
     ctx.register_hook("post_tool_call", _on_post_tool_call)
+    ctx.register_command(
+        "bibo-profile",
+        handler=_handle_bibo_profile,
+        description="Pokaż aktualny stan Bibo: faza, charakter, co działa.",
+    )

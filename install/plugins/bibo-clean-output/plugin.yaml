@@ -1,6 +1,6 @@
 name: bibo-clean-output
-version: "1.0.0"
-description: "Strip Bibo's internal thoughts from LLM output before it reaches the user. Reads debug_mode flag from /opt/data/hi-bibo/brain.json — when false (production) keeps only the message up to and including the first ',bibo' terminator; when true (testing) passes the full response through untouched. Cut thoughts are appended to /opt/data/hi-bibo/logs/thoughts.log with a timestamp so nothing is lost."
+version: "1.1.0"
+description: "Bibo profile plugin: (1) strip Bibo's internal thoughts from LLM output before it reaches the user, controlled by debug_mode in /opt/data/hi-bibo/brain.json; (2) enforce brain.json schema after every write by patching missing top-level keys from brain.template.json; (3) expose /bibo-profile slash command showing the agent's self-state (phase, breath count, character params, what forms worked). Scoped to the bibo profile only."
 author: "Kamil Bandzwołek"
 hooks:
   - transform_llm_output
