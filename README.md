@@ -115,9 +115,10 @@ SOUL.md definiuje charakter Bibo, reguły komunikacji (Hi..., ,bibo) i zakaz wys
 
 ### Krok 6b: Zainstaluj plugin `bibo-clean-output`
 
-Plugin zapewnia dwie rzeczy:
+Plugin zapewnia trzy rzeczy:
 1. **Filtruje myśli Bibo** — usuwa wszystko po pierwszym `bibo` (przemyślenia po tool_call nie lecą do usera, tylko do `logs/thoughts.log`)
 2. **Pilnuje struktury brain.json** — jeśli Bibo w oddechu wyrzuci jakiś top-level klucz, plugin przywraca go z `brain.template.json`
+3. **Slash-komenda `/bibo-profile`** — pokazuje kartę partnera na Telegramie (faza, oddechy, charakter, co działa/co nie)
 
 Instalacja:
 ```bash
@@ -139,6 +140,19 @@ HERMES_HOME=/opt/data/profiles/bibo hermes config set auxiliary.background_revie
 **Sterowanie filtrem myśli:** pole `debug_mode` w `brain.json`:
 - `false` (produkcja) — user widzi tylko wiadomość Bibo, przemyślenia lądują w `logs/thoughts.log`
 - `true` (debug) — plugin nic nie tnie, user widzi wszystko
+
+**Komenda `/bibo-profile` na Telegramie**
+
+Zwraca zwartą "kartę partnera" — tylko dane o samym Bibo (nie o userze):
+
+- Aktualna faza (adaptacja / partnerstwo / cisza) + opis
+- Liczba oddechów + timestamp ostatniej aktualizacji brain
+- Stan flagi `debug_mode`
+- 6 parametrów charakteru jako paski tekstowe (bezpośredniość, cierpliwość, humor, prowokacyjność, emocjonalność, ciekawość) — ewoluują z rozmowy
+- `co_dziala.skuteczne` — formy komunikacji które zadziałały
+- `co_dziala.nieskuteczne` — formy które user odrzucił
+
+Pure file read — nic nie idzie do LLM, można spamować bez kosztów. W Telegramie może być ukryta w liście komend (jeśli bot ma >60 komend zarejestrowanych), ale nadal działa gdy się ją wpisze ręcznie.
 
 ### Krok 7: Skopiuj skrypt oddechu
 
