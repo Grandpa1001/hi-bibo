@@ -89,6 +89,13 @@ def _on_transform_llm_output(
     if _read_debug_mode():
         return None
 
+    # SILENT protocol — cron jobs return exactly "[SILENT]" to suppress
+    # delivery entirely. Hermes gateway handles this natively; the plugin
+    # must NOT touch it. Also accept the bare word (belt-and-braces).
+    stripped = response_text.strip()
+    if stripped == "[SILENT]" or stripped == "SILENT":
+        return None
+
     match = TERMINATOR_RE.search(response_text)
     if match is None:
         # No 'bibo' terminator found — this is Bibo's second, "thinking"
