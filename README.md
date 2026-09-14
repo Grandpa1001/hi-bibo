@@ -208,7 +208,7 @@ Lub utwórz ręcznie w pliku `/opt/data/profiles/bibo/cron/jobs.json`:
       "continuity": true,
       "schedule": {
         "kind": "interval",
-        "seconds": 3600,
+        "minutes": 60,
         "display": "every 60m"
       },
       "schedule_display": "every 60m",
@@ -243,6 +243,10 @@ hermes gateway stop --profile bibo
 hermes gateway start --profile bibo
 ```
 
+> **Uwaga o `schedule`:** Hermes cron dla `kind: interval` czyta pole `minutes`. Format `"seconds": 3600` nie działa — job wpada w `state: error` z komunikatem *"Failed to compute next run"*. Używaj `"minutes": N`.
+
+> **Uwaga o `no_agent: false`:** Ten cron **musi** działać w trybie hermes-agent (`no_agent: false`), nie script-only. Powód: skrypt `breath.py` nie woła Anthropic samodzielnie — tylko dostarcza kontekst (brain.json, knowledge.md, czas) na stdout. LLM wywołuje hermes-agent, który dziedziczy uwierzytelnianie gatewaya (w tym OAuth). Gdyby ustawić `no_agent: true`, skrypt musiałby sam uwierzytelnić się w Anthropic — a OAuth tokens `sk-ant-oat*` nie działają jako zwykły API key.
+
 ### Krok 10: Napisz do bota
 
 Otwórz Telegram → @Hi_Bibo_bot → `/start`
@@ -260,6 +264,10 @@ Bibo odpowie przy następnym oddechu (max 1h) lub od razu jeśli gateway jest ak
 | `hermes send` wysyła przez default bota | `hermes send` zawsze czyta `.env` z HERMES_HOME, nie z profilu. Używaj gateway bibo do delivery. |
 | Wiadomość przyszła od Hermesa zamiast Hi-Bibo | Cron odpalił się na default profile. Upewnij się że job jest TYLKO w `profiles/bibo/cron/jobs.json` |
 | `Script not found: breath.py` | Skrypt musi być w `profiles/bibo/scripts/breath.py` |
+| Cron `state=error`, `Failed to compute next run` | Schedule ma `"seconds": N` zamiast `"minutes": N`. Hermes cron dla `kind: interval` czyta tylko `minutes`. |
+| Cron pisze `401 API key is invalid` w `breath.py` | Job ma `no_agent: true` — skrypt próbuje sam wołać Anthropic. Zmień na `no_agent: false`, żeby to hermes-agent wołał LLM (dziedziczy OAuth z gatewaya). |
+| Co godzinę dostajesz `bibo` samo bez treści | Bibo poprawnie zwraca `[SILENT]` gdy nic do powiedzenia, ale pluginy filtrujące myśli mogą go zamieniać na `bibo`. Fix: plugin `bibo-clean-output` musi przepuszczać `[SILENT]` niezmienione. |
+| Wiadomość od Hermesa "💾 Self-improvement review: ..." | Wbudowany `background_review` w Hermesie działa równolegle do brain.json Bibo. Wyłącz: `hermes config set auxiliary.background_review.enabled false` w profilu bibo. |
 
 ---
 
