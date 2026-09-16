@@ -1,9 +1,31 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "debug_mode": false,
   "last_updated": null,
   "breath_count": 0,
   "phase": "adaptation",
+  "setup": {
+    "complete": false,
+    "completed_at": null,
+    "installer": null
+  },
+  "partner": {
+    "name": "Bibo",
+    "language": "pl",
+    "goal": "",
+    "role": "partner",
+    "tts": {
+      "enabled": true,
+      "provider": "edge",
+      "voice": "pl-PL-ZofiaNeural",
+      "mode": "off"
+    },
+    "contact": {
+      "frequency": "normal",
+      "initiative": "balanced",
+      "length": "short"
+    }
+  },
   "profil": {
     "description": "Kim jest user - wiek, praca, sytuacja, specyfika ADHD",
     "data": {},
@@ -44,6 +66,11 @@
     "description": "Co user chce osiągnąć vs co faktycznie robi",
     "deklaracje": [],
     "rzeczywistosc": [],
+    "last_updated": null
+  },
+  "wnioski": {
+    "description": "Wnioski partnera z dowodem (cytat, powtórzenie, timestamp) — nie vibe",
+    "entries": [],
     "last_updated": null
   },
   "co_dziala": {

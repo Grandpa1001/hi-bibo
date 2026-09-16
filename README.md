@@ -24,9 +24,13 @@ hi-bibo/
 ├── knowledge.md        # Static ADHD knowledge base
 ├── prompt.md           # Bibo system prompt (main file)
 ├── scripts/
-│   └── breath.py       # Breath script — brain + time
+│   ├── breath.py       # Breath + decision slot
+│   ├── decision.py     # Hard MUST/MAY/SILENT budget
+│   ├── analytics.py    # Quality index CLI (operator)
+│   └── test_analytics.py
 ├── install/
-│   ├── SOUL.md         # Character + sections: brain update after conversation, cron breaths
+│   ├── setup.py        # Installer + wizard (name, goal, language, TTS)
+│   ├── SOUL.md
 │   └── plugins/bibo-clean-output/
 ├── README.md           # This file (English, default)
 ├── README.pl.md        # Polish version
@@ -35,10 +39,11 @@ hi-bibo/
 ```
 
 **How it works:**
-1. Hermes cron (alarm clock) wakes the agent every hour on the `bibo` profile
-2. `scripts/breath.py` loads `brain.json` + current time (no knowledge.md)
-3. Gateway — the only agent that thinks — reads brain and decides whether to write
-4. If writing → message goes to Telegram and is mirrored to the gateway session (`attach_to_session: true`)
+1. Hermes cron wakes the `bibo` profile every hour
+2. `scripts/breath.py` loads `brain.json`, time, and a **hard decision slot** (`MUST_WRITE` / `MAY_WRITE` / `SILENT`)
+3. The model writes the message only if the slot allows it — the plugin enforces `SILENT`
+4. If writing → Telegram (text + optional Edge Neural voice bubble via `/voice tts`)
+5. After a conversation the agent may add one evidence-backed entry to `wnioski.entries`
 5. User replies → gateway has full conversation context
 6. Agent updates `brain.json` after each conversation (described in SOUL.md: *Updating brain.json after a conversation*)
 7. If there's nothing to say → cron returns `[SILENT]`
@@ -54,205 +59,70 @@ hi-bibo/
 
 ---
 
-## Step-by-step Installation
+## Installation
 
 ### Requirements
-- [Hermes](https://github.com/nousresearch/hermes) installed and running
-- Telegram account
-- Anthropic API key (for the LLM)
+- [Hermes Agent](https://github.com/nousresearch/hermes) on PATH
+- Telegram account + token from [@BotFather](https://t.me/BotFather)
+- Your Telegram user ID (message [@userinfobot](https://t.me/userinfobot))
+- Model auth in Hermes (Anthropic API key or OAuth)
+- `ffmpeg` — without it Edge TTS is sent as a file, not a voice bubble (`brew install ffmpeg` / `sudo apt install ffmpeg`)
 
-### Step 1: Create a Telegram bot
-
-1. Open Telegram → search for **@BotFather**
-2. Send `/newbot`
-3. Name: `Hi-Bibo` (or anything you like)
-4. Username: `hi_bibo_bot` (or any available name)
-5. **Copy the token** — you'll need it in step 3
-
-### Step 2: Clone the repo
+### 1. Clone the pack
 
 ```bash
-cd /opt/data  # or your HERMES_HOME
+cd /opt/data   # or whatever Hermes uses as workdir
 git clone https://github.com/Grandpa1001/hi-bibo.git
 cd hi-bibo
-
-# Create brain.json from template
-cp brain.template.json brain.json
 ```
 
-### Step 3: Create the Hermes `bibo` profile
+### 2. Run the wizard
 
 ```bash
-hermes profile create bibo --no-skills \
-  --description "Hi-Bibo: autonomous AI partner for people with ADHD"
+python3 install/setup.py
 ```
 
-### Step 4: Configure the bibo profile .env
+The wizard asks, in order:
+1. **Language** — pl / en
+2. **Partner name** — 3 random suggestions (Mira, Nox, Olek, …) or your own
+3. **Relationship goal** — one contract, e.g. "ship the sprint, no new projects"
+4. **Frequency** — rarely / normal / often (this is a hard budget, not a prompt)
+5. **TTS** — Edge Neural (`Zofia` / `Marek` for Polish, `Aria` / `Andrew` for English). This is **not** Telegram's built-in voice.
+6. **Bot token** and **your user ID**
 
-Edit `/opt/data/profiles/bibo/.env`:
+The script creates the `bibo` profile, copies SOUL + plugin + scripts, writes `.env`, sets TTS/STT in `config.yaml`, installs the breath cron, writes `brain.json`, and starts the gateway.
 
-```env
-ANTHROPIC_API_KEY=«redacted:sk-…»
-TELEGRAM_BOT_TOKEN=YOUR_BOTFATHER_TOKEN
-TELEGRAM_ALLOWED_USERS=YOUR_TELEGRAM_USER_ID
-```
-
-> **How to find your Telegram User ID:** message @userinfobot on Telegram.
-
-### Step 5: Configure the bibo profile config.yaml
-
-Edit `/opt/data/profiles/bibo/config.yaml` — add these sections:
-
-```yaml
-agent:
-  max_turns: 50
-  reasoning_effort: medium
-gateway:
-  telegram:
-    - hermes-telegram
-platforms:
-  telegram:
-    enabled: true
-    home_channel:
-      platform: telegram
-      chat_id: 'YOUR_TELEGRAM_USER_ID'
-      name: YourName
-      user_id: 'YOUR_TELEGRAM_USER_ID'
-```
-
-### Step 6: Set up the bibo profile SOUL.md
-
-Copy the ready-made file from `install/`:
+Non-interactive:
 
 ```bash
-cp /opt/data/hi-bibo/install/SOUL.md /opt/data/profiles/bibo/SOUL.md
+python3 install/setup.py --yes --language pl --name Mira \
+  --goal "ship the sprint" --frequency normal --tts zofia \
+  --telegram-token 'TOKEN' --telegram-user-id '123456'
 ```
 
-SOUL.md defines Bibo's character, communication rules (Hi..., ,bibo), the ban on sending internal thoughts to the user, plus new sections: *Updating brain.json after a conversation* and *Cron breaths*.
+### 3. Telegram — first 30 seconds
 
-### Step 6b: Install the `bibo-clean-output` plugin
+Open the bot → `/start`, then:
 
-The plugin does three things:
-1. **Filters Bibo's thoughts** — strips everything after the first `bibo` (internal reasoning after tool_call goes to `logs/thoughts.log`, not the user)
-2. **Guards brain.json structure** — if Bibo drops a top-level key during a breath, the plugin restores it from `brain.template.json`
-3. **Slash command `/bibo-profile`** — shows a partner card on Telegram (phase, breaths, character traits, what works / what doesn't)
+| Command | What it does |
+|---|---|
+| `/bibo-setup` | In-chat wizard (name, goal, language, TTS, frequency). No LLM. |
+| `/voice tts` | Replies as an **Edge Neural voice bubble** (not Telegram TTS) |
+| `/bibo-profile` | Partner card |
+| `/bibo-analytics` | Index of whether Bibo itself is working better |
 
-Installation:
-```bash
-mkdir -p /opt/data/profiles/bibo/plugins
-cp -r /opt/data/hi-bibo/install/plugins/bibo-clean-output /opt/data/profiles/bibo/plugins/
+`/bibo-setup losuj` suggests new names.
 
-# Enable the plugin in the bibo profile config.yaml:
-HERMES_HOME=/opt/data/profiles/bibo hermes config set plugins.enabled '["bibo-clean-output"]'
+### What is deterministic after install
 
-# Silence the system "💾 Self-improvement review" notification (not from Bibo):
-HERMES_HOME=/opt/data/profiles/bibo hermes config set display.memory_notifications off
+- **When to write** is computed by `scripts/decision.py` (daily cap, 12h anti-silence, night quiet). The model does not vote.
+- A `SILENT` slot is **enforced** by the plugin.
+- **Conclusions** go to `brain.json → wnioski.entries` only with evidence.
+- Pack TTS: `edge` + locale voice + Whisper `small` for STT (better Polish than `base`).
 
-# Disable the background_review mechanism entirely — Bibo works exclusively
-# on its own brain.json + thoughts.log; Hermes's built-in memory isn't needed
-# and only adds noise + background API costs.
-HERMES_HOME=/opt/data/profiles/bibo hermes config set auxiliary.background_review.enabled false
-```
-
-**Controlling the thought filter:** the `debug_mode` field in `brain.json`:
-- `false` (production) — user sees only Bibo's message, thoughts go to `logs/thoughts.log`
-- `true` (debug) — plugin doesn't filter, user sees everything
-
-**`/bibo-profile` command on Telegram**
-
-Returns a compact "partner card" — data about Bibo itself (not the user):
-
-- Current phase (adaptation / partnership / silence) + description
-- Breath count + timestamp of last brain update
-- `debug_mode` flag state
-- 6 character parameters as text bars (directness, patience, humor, provocativeness, emotionality, curiosity) — evolve through conversation
-- `co_dziala.skuteczne` — communication forms that worked
-- `co_dziala.nieskuteczne` — forms the user rejected
-
-Pure file read — nothing goes to the LLM, spam it for free. On Telegram it may be hidden in the command list (if the bot has >60 registered commands), but still works when typed manually.
-
-### Step 7: Copy the breath script
-
-```bash
-mkdir -p /opt/data/profiles/bibo/scripts
-cp /opt/data/hi-bibo/scripts/breath.py /opt/data/profiles/bibo/scripts/breath.py
-```
-
-### Step 8: Start the bibo gateway
-
-```bash
-hermes gateway start --profile bibo
-```
-
-Verify it's running:
-```bash
-hermes profile list
-# bibo should show status: running
-```
-
-### Step 9: Create the cron job (hourly breath)
-
-⚠️ **IMPORTANT:** The cron job MUST be created from within the bibo profile (via the Telegram bot or the bibo gateway). NOT via `hermes cron create` from the terminal — that creates the job on the default profile!
-
-**Method: Message @Hi_Bibo_bot on Telegram:**
-
-```
-/cron every 1h bibo-breath
-```
-
-Or create manually in `/opt/data/profiles/bibo/cron/jobs.json`:
-
-```json
-{
-  "jobs": [
-    {
-      "id": "GENERATE_UNIQUE_ID",
-      "name": "bibo-breath",
-      "prompt": "You are Bibo. This is your breath.\nRead prompt.md and brain.json.\nDecide whether to write.\nMESSAGE → content. SILENT → [SILENT].\nStart with 'Hi', end with ',bibo'.",
-      "script": "breath.py",
-      "no_agent": false,
-      "attach_to_session": true,
-      "origin": {
-        "platform": "telegram",
-        "chat_id": "YOUR_TELEGRAM_USER_ID",
-        "user_id": "YOUR_TELEGRAM_USER_ID",
-        "chat_type": "private"
-      },
-      "continuity": true,
-      "schedule": {
-        "kind": "interval",
-        "minutes": 60,
-        "display": "every 60m"
-      },
-      "enabled": true,
-      "deliver": "telegram:YOUR_TELEGRAM_USER_ID",
-      "workdir": "/opt/data/hi-bibo"
-    }
-  ],
-  "updated_at": "2026-09-13T16:00:00+00:00"
-}
-```
-
-After editing, restart the gateway:
-```bash
-hermes gateway stop --profile bibo
-hermes gateway start --profile bibo
-```
-
-> **Note on `schedule`:** Hermes cron for `kind: interval` reads the `minutes` field. The format `"seconds": 3600` doesn't work — the job falls into `state: error` with *"Failed to compute next run"*. Use `"minutes": N`.
-
-> **Note on `no_agent: false`:** This cron **must** run in hermes-agent mode (`no_agent: false`), not script-only. Reason: `breath.py` doesn't call Anthropic on its own — it only provides context (brain.json, time) on stdout. The LLM is invoked by hermes-agent, which inherits the gateway's authentication (including OAuth). Setting `no_agent: true` would require the script to authenticate with Anthropic itself — and OAuth tokens `sk-ant-oat*` don't work as regular API keys.
-
-> **Note on `attach_to_session: true`:** Cron output is mirrored to the gateway's Telegram session. This way the user's reply lands in the same thread and the gateway has full conversation context.
-
-### Step 10: Message the bot
-
-Open Telegram → @Hi_Bibo_bot → `/start`
-
-Bibo will reply at the next breath (max 1h) or immediately if the gateway is active.
+The old 10-step manual install is replaced by this script.
 
 ---
-
 ## Known Pitfalls
 
 | Problem | Solution |
@@ -266,6 +136,7 @@ Bibo will reply at the next breath (max 1h) or immediately if the gateway is act
 | Cron logs `401 API key is invalid` in `breath.py` | Job has `no_agent: true` — script tries to call Anthropic directly. Change to `no_agent: false` so hermes-agent calls the LLM (inherits OAuth from the gateway). |
 | Getting bare `bibo` with no content every hour | Bibo correctly returns `[SILENT]` when there's nothing to say, but thought-filtering plugins may turn it into bare `bibo`. Fix: `bibo-clean-output` plugin must pass `[SILENT]` through unchanged. |
 | "💾 Self-improvement review: ..." message from Hermes | Hermes's built-in `background_review` runs alongside Bibo's brain.json. Disable: `hermes config set auxiliary.background_review.enabled false` on the bibo profile. |
+| Voice sounds like cheap Telegram TTS | That's not Edge. Pick Zofia/Marek in the wizard, install `ffmpeg`, then `/voice tts` in chat. |
 
 ---
 
@@ -276,6 +147,39 @@ Bibo will reply at the next breath (max 1h) or immediately if the gateway is act
 3. **Check brain:** `cat hi-bibo/brain.json | python3 -m json.tool`
 4. **Force a breath:** message @Hi_Bibo_bot "breathe" or wait for the scheduled run
 5. **Check logs:** `cat profiles/bibo/logs/agent.log | tail -20`
+
+---
+
+## Quality analytics
+
+A single `brain.json` snapshot cannot tell you whether a prompt or cron change made Bibo better. You need a time series.
+
+Analytics layer:
+- `scripts/breath.py` writes a brain snapshot on every breath
+- the plugin records inbound/outbound turns (length, hash, hygiene flags — **no message bodies**)
+- file: `$BIBO_DIR/logs/analytics.jsonl` (gitignored)
+
+```bash
+# on the machine where Bibo lives
+BIBO_DIR=/opt/data/hi-bibo python3 /opt/data/hi-bibo/scripts/analytics.py report
+BIBO_DIR=/opt/data/hi-bibo python3 /opt/data/hi-bibo/scripts/analytics.py report --json --days 7
+
+# on Telegram (plugin ≥ 1.2)
+/bibo-analytics
+/bibo-analytics 14
+```
+
+**Index 0–100** (behavioral proxy, not a clinical ADHD score), weights:
+| Component | Weight | What it measures |
+|---|---|---|
+| 6h reply rate | 35% | Whether the user replies to Bibo |
+| Presence | 25% | Whether Bibo pings after >12h of user silence |
+| Learning | 20% | Mean bucket `confidence` in brain.json |
+| Hygiene | 20% | No guilt-trips, sycophancy, walls of text, thought leaks |
+
+The report compares **the last N days vs the previous N days**. Verdict `rosnie` / `spada` / `stabilne` requires a ≥5 point move. Too few events → index is `null`, not a guess.
+
+Bibo must **not** load this report into context — otherwise it will optimize the metric instead of the relationship.
 
 ---
 
