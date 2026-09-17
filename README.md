@@ -27,7 +27,8 @@ hi-bibo/
 │   ├── breath.py       # Breath + decision slot
 │   ├── decision.py     # Hard MUST/MAY/SILENT budget
 │   ├── analytics.py    # Quality index CLI (operator)
-│   └── test_analytics.py
+│   ├── test_analytics.py
+│   └── test_decision.py
 ├── install/
 │   ├── setup.py        # Installer + wizard (name, goal, language, TTS)
 │   ├── SOUL.md
@@ -40,7 +41,7 @@ hi-bibo/
 
 **How it works:**
 1. Hermes cron wakes the `bibo` profile every hour
-2. `scripts/breath.py` loads `brain.json`, time, and a **hard decision slot** (`MUST_WRITE` / `MAY_WRITE` / `SILENT`)
+2. `scripts/breath.py` loads `brain.json`, time, and a **hard decision slot** (`MUST_WRITE` / `MAY_WRITE` / `SILENT`), then thaws the brain (count + decay) even on silence
 3. The model writes the message only if the slot allows it — the plugin enforces `SILENT`
 4. If writing → Telegram (text + optional Edge Neural voice bubble via `/voice tts`)
 5. After a conversation the agent may add one evidence-backed entry to `wnioski.entries`
@@ -115,8 +116,9 @@ Open the bot → `/start`, then:
 
 ### What is deterministic after install
 
-- **When to write** is computed by `scripts/decision.py` (daily cap, 12h anti-silence, night quiet). The model does not vote.
+- **When to write** is computed by `scripts/decision.py`: adaptation 3/day (1/8), partnership 6/day (1/4), plus 12h anti-silence and night quiet. T004 frequency (`rarely`/`often`) overrides the cap. The model does not vote.
 - A `SILENT` slot is **enforced** by the plugin.
+- Stale mood in `zachowania_biezace` **decays** (48h half-weight, 72h archive) so old “irritated” cannot freeze the agent.
 - **Conclusions** go to `brain.json → wnioski.entries` only with evidence.
 - Pack TTS: `edge` + locale voice + Whisper `small` for STT (better Polish than `base`).
 

@@ -1,6 +1,6 @@
 name: bibo-clean-output
-version: "1.3.0"
-description: "Bibo plugin: thought filter, brain schema, analytics, /bibo-setup wizard, deterministic SILENT slot, partner-name terminator. Scoped to bibo profile."
+version: "1.4.0"
+description: "Bibo plugin: thought filter, brain schema, analytics, /bibo-setup wizard, deterministic SILENT slot, last-contact stamps for anti-silence, partner-name terminator. Scoped to bibo profile."
 author: "Kamil Bandzwołek"
 hooks:
   - transform_llm_output

@@ -3,10 +3,12 @@
 
 Wypisuje na stdout kontekst potrzebny agentowi:
 - czas, slot decyzji (deterministyczny)
+- godziny od ostatniego kontaktu usera
 - partner (imię, język, cel)
-- stan brain.json
+- stan brain.json (po decay i inkrementacji oddechu)
 
-Skrypt NIE woła Anthropic API.
+Skrypt NIE woła Anthropic API. Aktualizuje brain.json nawet przy SILENT,
+żeby mózg nie zamarzał w pętli śmierci z T006.
 """
 
 import json
@@ -26,7 +28,7 @@ def main() -> None:
         print(f"ERROR: cannot load brain.json: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    now = datetime.now()
+    now = datetime.now().astimezone()
     partner = brain.get("partner") or {}
     name = partner.get("name") or "Bibo"
     language = partner.get("language") or "pl"
@@ -35,30 +37,61 @@ def main() -> None:
     print("## Aktualny czas")
     print(f"Data: {now.strftime('%Y-%m-%d')} ({now.strftime('%A')})")
     print(f"Godzina: {now.strftime('%H:%M')}")
-    print(f"Oddech nr: {brain.get('breath_count', 0) + 1}")
+    print(f"Oddech nr: {int(brain.get('breath_count') or 0) + 1}")
     print()
 
     print("## Partner")
     print(f"Imię: {name}")
     print(f"Język: {language}")
     print(f"Cel: {goal or '—'}")
+    print(f"Faza: {brain.get('phase') or 'adaptation'}")
     print()
 
     decision = None
+    decay = None
     try:
         scripts = os.path.join(BIBO_DIR, "scripts")
         if scripts not in sys.path:
             sys.path.insert(0, scripts)
-        from decision import compute_slot, write_decision
+        from decision import compute_slot, maintain_brain, write_brain, write_decision
 
-        decision = compute_slot(brain)
+        decision = compute_slot(brain, now=now)
         write_decision(decision)
+        updated = maintain_brain(brain, decision, now=now)
+        decay = updated.pop("_decay", None)
+        try:
+            write_brain(updated, BRAIN_PATH)
+            brain = updated
+        except OSError as exc:
+            print(f"WARN: cannot thaw brain.json: {exc}", file=sys.stderr)
+
         print("## Slot decyzji (kod — nie głosuj)")
         print(f"slot: {decision['slot']}")
         print(f"powód: {decision['reason']}")
-        print(f"limit dnia: {decision['cap']}  |  wysłane dziś: {decision['spoken_today']}")
+        print(f"faza: {decision.get('phase')}  |  limit dnia: {decision['cap']}  |  wysłane dziś: {decision['spoken_today']}")
         print("MUST_WRITE → napisz. SILENT → dokładnie [SILENT]. MAY_WRITE → tylko gdy masz wniosek z dowodem.")
         print()
+
+        hours = decision.get("hours_since_user")
+        hours_bibo = decision.get("hours_since_bibo")
+        print("## Kontakt")
+        if hours is None:
+            print("Ostatni inbound usera: brak (jeszcze nie pisał albo brak timestampu)")
+        else:
+            print(f"Ostatni inbound usera: {hours}h temu")
+        if hours_bibo is None:
+            print("Ostatni outbound Bibo: brak")
+        else:
+            print(f"Ostatni outbound Bibo: {hours_bibo}h temu")
+        if decision.get("failure_24h"):
+            print("NIEPOWODZENIE: user milczy >24h po kontakcie. Nie guilt-tripuj. Jeden spokojny sygnał życia, nie śledztwo.")
+        print()
+
+        if decay:
+            print("## Decay zachowania_biezace")
+            print(f"aktywne: {decay.get('active', 0)}  |  waga 0.5 (>48h): {decay.get('halved', 0)}  |  archiwum (>72h): {decay.get('archived', 0)}")
+            print("Wpisów z waga 0.5 lub archiwum NIE traktuj jako aktualnego nastroju. Nie blokuj inicjatywy starym „zirytowany”.")
+            print()
     except Exception as exc:
         print(f"WARN: decision slot failed: {exc}", file=sys.stderr)
 

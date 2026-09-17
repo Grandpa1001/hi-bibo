@@ -1,9 +1,18 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "debug_mode": false,
   "last_updated": null,
   "breath_count": 0,
+  "last_user_contact": null,
+  "last_bibo_message": null,
+  "spoken_on": null,
+  "spoken_today": 0,
   "phase": "adaptation",
+  "silence": {
+    "hours_since_user": null,
+    "failure_24h": false,
+    "failure_at": null
+  },
   "setup": {
     "complete": false,
     "completed_at": null,
@@ -45,9 +54,12 @@
     "last_updated": null
   },
   "zachowania_biezace": {
-    "description": "Co robi teraz, energia, ton, temat ostatnich rozmów",
+    "description": "Co robi teraz, energia, ton, temat ostatnich rozmów. Waga 1.0 <48h, 0.5 48–72h, 0 po archiwum.",
     "data": {},
+    "data_weight": 1.0,
     "entries": [],
+    "archived": [],
+    "archived_data": [],
     "last_updated": null
   },
   "problemy_stale": {

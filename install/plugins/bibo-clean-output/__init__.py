@@ -444,6 +444,70 @@ def _analytics_mod():
         return None
 
 
+def _decision_mod():
+    scripts = os.path.join(BIBO_DIR, "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    try:
+        import decision as decision_mod  # type: ignore
+        return decision_mod
+    except Exception as exc:
+        logger.debug("bibo-clean-output: cannot import decision: %s", exc)
+        return None
+
+
+def _is_fresh_silent_slot(decision_mod) -> bool:
+    decision = decision_mod.load_decision() if decision_mod else None
+    if not decision or decision.get("slot") != "SILENT":
+        return False
+    ts_raw = decision.get("ts")
+    try:
+        ts = datetime.fromisoformat(str(ts_raw))
+    except (TypeError, ValueError):
+        return False
+    now = datetime.now().astimezone()
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=now.tzinfo)
+    age = (now - ts).total_seconds()
+    return 0 <= age <= 20 * 60
+
+
+def _stamp_contacts(user_message: str, assistant_response: str) -> None:
+    """Persist last_user_contact / last_bibo_message so anti-silence works without analytics.jsonl."""
+    decision_mod = _decision_mod()
+    analytics = _analytics_mod()
+    if decision_mod is None:
+        return
+    try:
+        brain = _load_brain()
+        if not brain:
+            return
+        dirty = False
+        if user_message:
+            breath = False
+            if analytics is not None:
+                breath = analytics.is_breath_prompt(user_message)
+            else:
+                blob = user_message.lower()
+                breath = "oddech" in blob or "this is your breath" in blob or "## stan brain.json" in blob.lower()
+            if not breath:
+                decision_mod.stamp_last_user_contact(brain)
+                dirty = True
+        if assistant_response and not _is_fresh_silent_slot(decision_mod):
+            stripped = assistant_response.strip()
+            silent = stripped in ("[SILENT]", "SILENT")
+            leak = stripped.lower() in ("bibo",)
+            if analytics is not None:
+                silent = analytics.is_silent(assistant_response)
+            if not silent and not leak:
+                decision_mod.stamp_last_bibo_message(brain)
+                dirty = True
+        if dirty:
+            _save_brain(brain)
+    except Exception as exc:
+        logger.debug("bibo-clean-output: contact stamp failed: %s", exc)
+
+
 def _on_post_llm_call(
     user_message: str = "",
     assistant_response: str = "",
@@ -452,6 +516,7 @@ def _on_post_llm_call(
     **_kwargs: Any,
 ) -> None:
     """Record inbound/outbound turns into analytics.jsonl. No message bodies."""
+    _stamp_contacts(user_message, assistant_response)
     analytics = _analytics_mod()
     if analytics is None:
         return

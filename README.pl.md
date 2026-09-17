@@ -27,7 +27,8 @@ hi-bibo/
 │   ├── breath.py       # Oddech + slot decyzji
 │   ├── decision.py     # Twardy budżet MUST/MAY/SILENT
 │   ├── analytics.py    # CLI indeksu jakości (operator)
-│   └── test_analytics.py
+│   ├── test_analytics.py
+│   └── test_decision.py
 ├── install/
 │   ├── setup.py        # Instalator + kreator (imię, cel, język, TTS)
 │   ├── SOUL.md
@@ -40,7 +41,7 @@ hi-bibo/
 
 **Jak to działa:**
 1. Cron co godzinę budzi profil `bibo`
-2. `breath.py` podaje czas, brain i **twardy slot** (`MUST_WRITE` / `MAY_WRITE` / `SILENT`)
+2. `breath.py` podaje czas, brain i **twardy slot** (`MUST_WRITE` / `MAY_WRITE` / `SILENT`), potem odświeża mózg (licznik + decay) nawet przy ciszy
 3. Model pisze treść tylko gdy slot pozwala — plugin egzekwuje `SILENT`
 4. Wiadomość idzie na Telegram (tekst + opcjonalna bańka Edge Neural po `/voice tts`)
 5. Po rozmowie agent może dodać jeden wniosek z dowodem do `wnioski.entries`
@@ -112,8 +113,9 @@ Otwórz bota → `/start`, potem:
 
 ### Co jest deterministyczne po instalacji
 
-- **Kiedy pisać** liczy `scripts/decision.py` (limit dnia, anty-cisza 12h, cisza nocna). Model nie głosuje.
+- **Kiedy pisać** liczy `scripts/decision.py`: adaptacja 3/dobę (1/8), partnerstwo 6/dobę (1/4), anty-cisza 12h, cisza nocna. Częstość z T004 (`rzadko`/`często`) nadpisuje limit. Model nie głosuje.
 - Slot `SILENT` plugin **wymusza** — LLM nie przebije budżetu.
+- Stary nastrój w `zachowania_biezace` **starzeje się** (48h waga 0.5, 72h archiwum) — „zirytowany” z zeszłego tygodnia nie zamraża agenta.
 - **Wnioski** idą do `brain.json → wnioski.entries` tylko z dowodem.
 - TTS z paczki: `edge` + głos narodowy + Whisper `small` do STT (lepszy polski niż `base`).
 
