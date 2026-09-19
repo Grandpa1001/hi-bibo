@@ -3,3 +3,5 @@ brain.json
 __pycache__/
 .env
 logs/
+*.bibo-backup
+env.bibo-backup
