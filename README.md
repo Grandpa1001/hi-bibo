@@ -1,6 +1,7 @@
 🇬🇧 English | [🇵🇱 Polski](README.pl.md)
 
 # Hi-Bibo 🫧
+<img width="241" height="237" alt="1789408829285" src="https://github.com/user-attachments/assets/d7844c83-35dd-4be1-8a56-99133273befa" />
 
 ## What is Hi-Bibo?
 
