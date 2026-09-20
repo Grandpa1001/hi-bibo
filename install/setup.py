@@ -413,10 +413,24 @@ def apply_install(cfg: Dict[str, Any], args: argparse.Namespace) -> int:
         os.path.join(profile_home, "plugins", "bibo-clean-output"),
     )
     os.makedirs(os.path.join(profile_home, "scripts"), exist_ok=True)
-    for script in ("breath.py", "analytics.py", "decision.py"):
+    for script in ("breath.py", "analytics.py", "decision.py", "migrate_brain.py"):
         src = os.path.join(REPO_ROOT, "scripts", script)
         if os.path.isfile(src):
             shutil.copy2(src, os.path.join(profile_home, "scripts", script))
+
+    # Also copy migrate_brain.py to bibo_dir/scripts so breath.py can find it
+    bibo_scripts = os.path.join(bibo_dir, "scripts")
+    os.makedirs(bibo_scripts, exist_ok=True)
+    for script in ("breath.py", "analytics.py", "decision.py", "migrate_brain.py"):
+        src = os.path.join(REPO_ROOT, "scripts", script)
+        if os.path.isfile(src):
+            shutil.copy2(src, os.path.join(bibo_scripts, script))
+
+    # Copy prompt.md and knowledge.md to bibo_dir (referenced by SOUL.md at /opt/data/hi-bibo/)
+    for doc in ("prompt.md", "knowledge.md", "brain.template.json"):
+        src = os.path.join(REPO_ROOT, doc)
+        if os.path.isfile(src):
+            shutil.copy2(src, os.path.join(bibo_dir, doc))
 
     env_updates = {}
     if cfg["token"]:
