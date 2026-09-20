@@ -28,6 +28,27 @@ def main() -> None:
         print(f"ERROR: cannot load brain.json: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    # Auto-migrate brain schema if needed (T011)
+    try:
+        from migrate_brain import migrate_if_needed
+        migrate_result = migrate_if_needed(BRAIN_PATH)
+        if migrate_result.get("success") and not migrate_result.get("dry_run"):
+            # Reload brain after migration
+            with open(BRAIN_PATH, "r", encoding="utf-8") as f:
+                brain = json.load(f)
+            if migrate_result.get("applied"):
+                print(
+                    f"NOTICE: Brain migrated: {migrate_result.get('applied')}",
+                    file=sys.stderr,
+                )
+        elif not migrate_result.get("success"):
+            print(
+                f"WARNING: Migration failed: {migrate_result.get('error')}",
+                file=sys.stderr,
+            )
+    except Exception as exc:
+        print(f"WARNING: migrate_brain import failed (skipping): {exc}", file=sys.stderr)
+
     now = datetime.now().astimezone()
     partner = brain.get("partner") or {}
     name = partner.get("name") or "Bibo"

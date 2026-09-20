@@ -353,16 +353,50 @@ def apply_install(cfg: Dict[str, Any], args: argparse.Namespace) -> int:
     if not os.path.isfile(template_path):
         template_path = os.path.join(REPO_ROOT, "brain.template.json")
     template = load_json(template_path)
-    brain = build_brain(
-        template,
-        name=cfg["name"],
-        language=cfg["language"],
-        goal=cfg["goal"],
-        voice=cfg["voice"],
-        tts_on=cfg["tts_on"],
-        frequency=cfg["frequency"],
-    )
-    write_json(os.path.join(bibo_dir, "brain.json"), brain)
+
+    brain_path = os.path.join(bibo_dir, "brain.json")
+    existing_brain = None
+
+    # If brain.json exists, migrate it instead of overwriting (T011)
+    if os.path.isfile(brain_path):
+        try:
+            with open(brain_path, "r", encoding="utf-8") as f:
+                existing_brain = json.load(f)
+            # Backup before any changes
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            backup = os.path.join(bibo_dir, f"brain.backup.{ts}.json")
+            shutil.copy2(brain_path, backup)
+            print(f"Backed up existing brain to {backup}")
+        except (OSError, json.JSONDecodeError):
+            existing_brain = None
+
+    if existing_brain:
+        # Migrate existing brain, preserve user data, update config
+        print("Migrating existing brain.json...")
+        existing_brain["partner"]["name"] = cfg["name"]
+        existing_brain["partner"]["language"] = cfg["language"]
+        existing_brain["partner"]["goal"] = cfg["goal"]
+        existing_brain["partner"]["tts"]["voice"] = cfg["voice"]
+        existing_brain["partner"]["tts"]["enabled"] = cfg["tts_on"]
+        existing_brain["partner"]["contact"]["frequency"] = cfg["frequency"]
+        # Ensure all top-level keys from template exist
+        for key in template.keys():
+            if key not in existing_brain:
+                existing_brain[key] = template[key]
+        brain = existing_brain
+    else:
+        # New installation: build from template
+        brain = build_brain(
+            template,
+            name=cfg["name"],
+            language=cfg["language"],
+            goal=cfg["goal"],
+            voice=cfg["voice"],
+            tts_on=cfg["tts_on"],
+            frequency=cfg["frequency"],
+        )
+
+    write_json(brain_path, brain)
 
     created = run_hermes(
         ["profile", "create", profile, "--no-skills", "--description",
