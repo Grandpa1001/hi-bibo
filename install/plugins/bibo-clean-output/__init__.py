@@ -29,7 +29,7 @@ import os
 import re
 import sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,91 @@ def _terminator_re() -> re.Pattern:
 
 
 # ---------------------------------------------------------------------------
+# Output sanitization limits and helpers (T007)
+# ---------------------------------------------------------------------------
+
+MAX_MESSAGE_CHARS = 300
+MAX_MESSAGE_SENTENCES = 3
+THINKING_TOKENS_PATTERN = re.compile(
+    r"^(OBSERVE|THINK|WAIT|MESSAGE)\s*[:—-]",
+    re.IGNORECASE | re.MULTILINE
+)
+
+
+def _strip_thinking_tokens(text: str) -> Tuple[str, Optional[str]]:
+    """Remove internal thinking tokens (OBSERVE/THINK/WAIT/MESSAGE) from message body.
+
+    Returns: (cleaned_text, stripped_lines_or_none)
+    """
+    if not text:
+        return text, None
+
+    lines = text.split("\n")
+    cleaned_lines = []
+    stripped_lines = []
+
+    for line in lines:
+        if THINKING_TOKENS_PATTERN.match(line.strip()):
+            stripped_lines.append(line)
+        else:
+            cleaned_lines.append(line)
+
+    cleaned = "\n".join(cleaned_lines).strip()
+    stripped_text = "\n".join(stripped_lines) if stripped_lines else None
+    return cleaned, stripped_text
+
+
+def _ensure_hi_prefix(text: str, partner_name: str) -> Tuple[str, bool]:
+    """Ensure message starts with 'Hi'. Returns (message, was_fixed)."""
+    if not text:
+        return text, False
+
+    text_stripped = text.lstrip()
+    if text_stripped.lower().startswith("hi"):
+        return text, False
+
+    if text_stripped:
+        return f"Hi, {text_stripped}", True
+    return text, False
+
+
+def _truncate_to_limit(text: str) -> Tuple[str, Optional[str]]:
+    """Truncate message to MAX_MESSAGE_CHARS and MAX_MESSAGE_SENTENCES.
+
+    Returns: (truncated_text, excess_or_none)
+    """
+    if not text or len(text) <= MAX_MESSAGE_CHARS:
+        sentences = re.findall(r"[.!?…]+", text)
+        if len(sentences) <= MAX_MESSAGE_SENTENCES:
+            return text, None
+
+    sentences = re.split(r"([.!?…]+)", text)
+    kept_text = ""
+    sentence_count = 0
+    excess = ""
+
+    for i, segment in enumerate(sentences):
+        if not segment.strip():
+            continue
+
+        if sentence_count >= MAX_MESSAGE_SENTENCES or len(kept_text) + len(segment) > MAX_MESSAGE_CHARS:
+            excess = "".join(sentences[i:])
+            break
+
+        kept_text += segment
+        if re.match(r"[.!?…]+", segment):
+            sentence_count += 1
+
+    kept_text = kept_text.rstrip() + ("." if kept_text and not re.search(r"[.!?…]$", kept_text) else "")
+    return kept_text, excess if excess.strip() else None
+
+
+def _fallback_message(partner_name: str) -> str:
+    """Return minimal fallback message when output fails validation."""
+    return f"Hi, 🫧 ,{partner_name.lower()}"
+
+
+# ---------------------------------------------------------------------------
 # transform_llm_output — strip trailing thoughts from user-facing message
 # ---------------------------------------------------------------------------
 
@@ -78,10 +163,33 @@ def _read_debug_mode() -> bool:
         return False
 
 
+def _rotate_log(path: str, max_bytes: int = 1_000_000, keep: int = 3) -> None:
+    """Rotate log file when it exceeds max_bytes. Keep N backups. Never raises."""
+    try:
+        if not os.path.isfile(path):
+            return
+        if os.path.getsize(path) <= max_bytes:
+            return
+
+        for i in range(keep - 1, 0, -1):
+            old = f"{path}.{i}"
+            new = f"{path}.{i + 1}"
+            if os.path.isfile(old):
+                os.remove(new) if os.path.isfile(new) else None
+                os.rename(old, new)
+
+        if os.path.isfile(f"{path}.1"):
+            os.remove(f"{path}.1")
+        os.rename(path, f"{path}.1")
+    except OSError:
+        pass
+
+
 def _append_thoughts(cut_tail: str) -> None:
-    """Append cut thoughts to thoughts.log with timestamp. Never raises."""
+    """Append cut thoughts to thoughts.log with timestamp, rotate if needed. Never raises."""
     try:
         os.makedirs(os.path.dirname(THOUGHTS_LOG), exist_ok=True)
+        _rotate_log(THOUGHTS_LOG)
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         entry = (
             f"\n[{ts}] [bibo-clean-output] Cut trailing thoughts from LLM response:\n"
@@ -133,11 +241,21 @@ def _on_transform_llm_output(
     platform: str = "",
     **_kwargs: Any,
 ) -> Optional[str]:
-    """Strip everything after the first ',bibo' terminator.
+    """Sanitize LLM output: remove thinking tokens, strip tail, validate format, enforce limits.
+
+    Pipeline:
+    1. enforce_decision_slot (SILENT override)
+    2. SILENT protocol pass-through
+    3. Strip thinking tokens from body
+    4. Terminator cut + validate (no terminator → fallback)
+    5. Hi prefix validation
+    6. Length limit enforcement
+    7. Fallback if validation fails
 
     Returns:
         - New string (cleaned message) → replaces the response
-        - None → leave response unchanged (debug mode, no terminator, empty)
+        - None → leave response unchanged (debug mode)
+        - "[SILENT]" → deliver nothing
     """
     if not response_text:
         return None
@@ -145,46 +263,67 @@ def _on_transform_llm_output(
     if _read_debug_mode():
         return None
 
+    # Step 1: enforce decision slot
     enforced = _enforce_decision_slot(response_text)
     if enforced is not None:
         return enforced
 
-    # SILENT protocol — cron jobs return exactly "[SILENT]" to suppress
-    # delivery entirely. Hermes gateway handles this natively; the plugin
-    # must NOT touch it. Also accept the bare word (belt-and-braces).
+    # Step 2: SILENT protocol pass-through
     stripped = response_text.strip()
-    if stripped == "[SILENT]" or stripped == "SILENT":
+    if stripped in ("[SILENT]", "SILENT"):
         return None
 
-    match = _terminator_re().search(response_text)
-    marker = _partner_name().lower()
-    if match is None:
-        # No 'bibo' terminator found — this is Bibo's second, "thinking"
-        # message that leaked out after a tool call. Replace the entire
-        # content with the bare marker 'bibo' so the user sees only that
-        # short signal on Telegram instead of a paragraph of internal
-        # reasoning. The full original text is preserved in thoughts.log.
+    partner_name = _partner_name()
+    marker = partner_name.lower()
+
+    # Step 3: strip thinking tokens from body (before terminator cut)
+    text_cleaned, thinking_stripped = _strip_thinking_tokens(response_text)
+    if thinking_stripped:
         _append_thoughts(
-            f"[FULL RESPONSE HAD NO '{marker}' TERMINATOR — replaced with marker]\n{response_text}"
+            f"[THINKING TOKENS STRIPPED FROM BODY]\n{thinking_stripped}"
+        )
+        logger.info("bibo-clean-output: stripped thinking tokens from body")
+
+    # Step 4: terminator cut
+    match = _terminator_re().search(text_cleaned)
+    if match is None:
+        # No terminator found → fallback
+        _append_thoughts(
+            f"[NO TERMINATOR — using fallback]\nOriginal: {text_cleaned}"
         )
         logger.info(
-            "bibo-clean-output: no terminator (len=%d) — replacing with marker "
+            "bibo-clean-output: no terminator found (len=%d) — fallback "
             "(session=%s platform=%s)",
-            len(response_text), session_id, platform,
+            len(text_cleaned), session_id, platform,
         )
-        return marker
+        return _fallback_message(partner_name)
 
-    cut_at = match.start()  # cut BEFORE the ',bibo' — strip terminator itself
-    message = response_text[:cut_at].rstrip(" ,\t\n")
-    tail = response_text[match.end():]
+    cut_at = match.start()
+    message = text_cleaned[:cut_at].rstrip(" ,\t\n")
+    tail = text_cleaned[match.end():]
 
-    if not tail.strip():
-        return None
+    if tail.strip():
+        _append_thoughts(f"[TAIL AFTER TERMINATOR]\n{tail}")
 
-    _append_thoughts(tail)
+    # Step 5: validate Hi prefix
+    message, fixed_prefix = _ensure_hi_prefix(message, partner_name)
+    if fixed_prefix:
+        logger.info("bibo-clean-output: prepended Hi prefix")
+
+    # Step 6: enforce length limits
+    message, excess = _truncate_to_limit(message)
+    if excess:
+        _append_thoughts(f"[EXCESS BEYOND LIMIT]\n{excess}")
+        logger.info("bibo-clean-output: truncated to char/sentence limit")
+
+    # Step 7: final validation
+    if not message or not message.strip():
+        logger.warning("bibo-clean-output: message empty after sanitization — fallback")
+        return _fallback_message(partner_name)
+
     logger.info(
-        "bibo-clean-output: stripped %d chars of trailing thoughts (session=%s platform=%s)",
-        len(tail), session_id, platform,
+        "bibo-clean-output: sanitized OK (len=%d, session=%s platform=%s)",
+        len(message), session_id, platform,
     )
     return message
 
