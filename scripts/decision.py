@@ -106,6 +106,75 @@ def daily_cap(brain: Dict[str, Any]) -> int:
     return base
 
 
+def compute_adaptive_cap(
+    brain: Dict[str, Any],
+    events: List[Dict[str, Any]],
+    now: Optional[datetime] = None,
+) -> int:
+    """Dynamiczny cap na podstawie response rate z ostatnich 7 dni (T009).
+
+    Returns: cap wiadomości dziennie (1–6)
+    """
+    from datetime import timedelta
+
+    now = now or datetime.now().astimezone()
+    base_cap = daily_cap(brain)
+
+    # Ramp-up: pierwsze 3 dni = max(3, cap)
+    breath_count = int(brain.get("breath_count") or 0)
+    if breath_count < 72:  # Pierwsze 3 dni (24 * 3 oddechy)
+        return min(3, base_cap)
+
+    # Oblicz response rate z ostatnich 7 dni
+    window_start = now - timedelta(days=7)
+    outbound = [e for e in events if e.get("type") == "outbound" and e.get("ts")]
+    inbound = [e for e in events if e.get("type") == "inbound" and e.get("ts")]
+
+    # Filtruj do okna 7-dniowego
+    def _in_window(event: Dict[str, Any], start: datetime, end: datetime) -> bool:
+        ts = _parse_ts(event.get("ts"))
+        if ts is None:
+            return False
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=end.tzinfo)
+        return start <= ts <= end
+
+    outbound_recent = [e for e in outbound if _in_window(e, window_start, now)]
+    inbound_recent = [e for e in inbound if _in_window(e, window_start, now)]
+
+    spoken = [e for e in outbound_recent if not e.get("silent")]
+
+    if not spoken:
+        # Brak danych — użyj base cap
+        return base_cap
+
+    # Ile user odpowiedział na Bibo wiadomości w oknie 6h
+    matched, total, delays = _match_replies(spoken, inbound_recent, window_h=6.0)
+    response_rate = matched / len(spoken) if spoken else 0.0
+
+    # Dynamiczny cap (FREQUENCY_CAP nigdy nie jest nadpisywany — to hard override)
+    contact = partner_of(brain).get("contact") or {}
+    freq = str(contact.get("frequency") or "normal").lower()
+    if freq in FREQUENCY_CAP:
+        # User override (rarely/often) — nie adaptuj
+        return FREQUENCY_CAP[freq]
+
+    # Adaptive logic
+    if response_rate > 0.6:
+        cap = min(6, base_cap + 1)  # Wysokie zaangażowanie → +1 (max 6)
+    elif response_rate >= 0.3:
+        cap = base_cap  # Normalne zaangażowanie → base cap
+    else:
+        cap = max(1, base_cap - 1)  # Niskie zaangażowanie → -1 (min 1)
+
+    # Zapisz metrykę
+    brain.setdefault("engagement", {})
+    brain["engagement"]["response_rate_7d"] = round(response_rate, 3)
+    brain["engagement"]["last_calculated"] = now.isoformat(timespec="seconds")
+
+    return cap
+
+
 def _newer(left: Optional[datetime], right: Optional[datetime]) -> Optional[datetime]:
     if left is None:
         return right
@@ -143,7 +212,7 @@ def compute_slot(
 ) -> Dict[str, Any]:
     now = now or datetime.now().astimezone()
     events = events if events is not None else _load_events()
-    cap = daily_cap(brain)
+    cap = compute_adaptive_cap(brain, events, now)
     breath_count = int(brain.get("breath_count") or 0)
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     phase = phase_of(brain)
