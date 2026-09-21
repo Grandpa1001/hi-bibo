@@ -1,6 +1,6 @@
 # Analiza architektury Bibo (Hermes-native rebuild)
 
-**Status:** 🟢 M2 + M3 + M5 zamknięte (pliki), M6/M7/M8 wydzielone do [MAINTENANCE.md](MAINTENANCE.md) jako cykliczne praktyki operacyjne (nie build-once). Cały pakiet `bibo/` gotowy lokalnie. Blokada: M1/M2.5/M4-test/M5-test wymagają żywej instalacji Hermes (poza zakresem tej sesji).  
+**Status:** 🟡 M1 w toku na żywo — pierwszy realny test `hermes profile install` wykrył 2 problemy: (1) profil musi być płaski w korzeniu repo, nie w podfolderze `bibo/` — **naprawione** (repo spłaszczone); (2) install kopiuje pliki ale nie rejestruje profilu w `hermes profile list` — **przyczyna nieznana, czeka na retest po spłaszczeniu**. M6/M7/M8 wydzielone do [MAINTENANCE.md](MAINTENANCE.md) jako cykliczne praktyki operacyjne.  
 **Data rozpoczęcia:** 2026-09-21  
 **Cel:** Kompletny plan developmentu Bibo jako natywnego agenta Hermes.
 
@@ -200,25 +200,36 @@ Inne sytuacje (small talk, prosty fakt) — nie ładuje.
 
 ## Finalna architektura Bibo
 
-```
-bibo/                           # Profile Hermes (VPS: /opt/data/profiles/bibo/)
-├── SOUL.md                     # Tożsamość Bibo (~30 linii)
-│                                 # "Jestem partnerem intelektualnym..."
-├── AGENTS.md                   # Reguły partnerstwa (~50 linii)
-│                                 # Anti-sycophancy, format, styl, safety
-├── brain.json                  # Ultra-slim (~10 linii)
-│                                 # partner.name/goal/language + onboarding
-├── skills/
-│   └── bibo-critical-thinking/
-│       ├── SKILL.md            # Metadata + trigger conditions
-│       └── socratic-questions.md # 5 typów pytań + przykłady
-├── config.yaml                 # Sonnet 4.6, prompt caching, Telegram gateway
-└── README.md                   # Instalacja dla open-source usera
+**AKTUALIZACJA (2026-09-21, po pierwszym realnym teście instalacji):**
+Pierwotny plan miał profil w podfolderze `bibo/`. Realny test
+`hermes profile install github.com/Grandpa1001/hi-bibo` pokazał że Hermes
+traktuje **cały korzeń repo jako treść dystrybucji** — plik
+`distribution.yaml` musi leżeć obok właściwych plików profilu (`SOUL.md`
+itd.), nie w podfolderze. Struktura poniżej już odzwierciedla tę korektę
+(repo spłaszczone, `bibo/` nie istnieje jako podfolder).
 
-# Hermes built-in (zarządzane automatycznie):
-# - memory/       (session context + trwałe fakty)
-# - logs/         (historie rozmów, debug)
-# - .env          (TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY)
+```
+distribution.yaml               # Manifest instalacji: name, version, description, author
+SOUL.md                         # Tożsamość Bibo (~30 linii)
+AGENTS.md                       # Reguły partnerstwa (~50 linii)
+                                 # Anti-sycophancy, format, styl, safety
+brain.template.json             # Ultra-slim (~10 linii)
+                                 # partner.name/goal/language + onboarding
+skills/
+└── bibo-critical-thinking/
+    ├── SKILL.md                # Metadata + trigger conditions
+    ├── socratic-questions.md   # 5 typów pytań + przykłady
+    └── examples.md             # Przykładowe rozmowy
+config.yaml                     # Sonnet 4.6, prompt caching, Telegram gateway
+
+# Pliki projektowe w tym samym korzeniu (Hermes je ignoruje, ale kopiuje
+# razem z profilem przy instalacji — kosmetyczny, nie funkcjonalny problem):
+# README.md, README.pl.md, Analiza.MD, MAINTENANCE.md, MAINTENANCE.pl.md,
+# CHANGELOG.md, LICENSE, .gitignore, .gitattributes
+
+# Hermes built-in (generowane automatycznie przy instalacji profilu):
+# cron/, home/, logs/, memories/, plans/, sessions/, skins/, workspace/
+# .env          (TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY)
 ```
 
 **Co znika kompletnie:**
@@ -252,11 +263,11 @@ bibo/                           # Profile Hermes (VPS: /opt/data/profiles/bibo/)
 - **Definition of done:** `hermes chat bibo` odpowiada domyślnie
 
 ### M2 — SOUL.md + AGENTS.md
-- [x] SOUL.md: tożsamość Bibo (32 linie) — `bibo/SOUL.md`
+- [x] SOUL.md: tożsamość Bibo (32 linie) — `SOUL.md`
   - Kim jest (partner do myślenia, neutralny)
   - Jaki styl (luźny, PL, per Ty, ,bibo na końcu)
   - Fixed personality, pamięć minimalna, bezpieczeństwo
-- [x] AGENTS.md: reguły pracy (49 linii) — `bibo/AGENTS.md`
+- [x] AGENTS.md: reguły pracy (49 linii) — `AGENTS.md`
   - Onboarding (2 pytania: imię, cel)
   - Critical thinking trigger (kiedy ładować skill)
   - Anti-sycophancy
@@ -266,7 +277,7 @@ bibo/                           # Profile Hermes (VPS: /opt/data/profiles/bibo/)
 - **Definition of done:** pliki gotowe do instalacji; test CLI odłożony do momentu instalacji przez usera
 
 ### M3 — Skill `bibo-critical-thinking` ✅ (pliki gotowe)
-- [x] SKILL.md z metadata (frontmatter name/description) + trigger conditions — `bibo/skills/bibo-critical-thinking/SKILL.md`
+- [x] SKILL.md z metadata (frontmatter name/description) + trigger conditions — `skills/bibo-critical-thinking/SKILL.md`
 - [x] socratic-questions.md — 5 typów pytań (założenia/powody/alternatywy/konsekwencje/perspektywa) z przykładami — `socratic-questions.md`
 - [x] examples.md — 5 pełnych wymian user→Bibo + sekcja "czego unikać" — `examples.md`
 - [ ] Test: Bibo ładuje skill i pyta trafnie (wymaga instalacji na Hermesie)
@@ -285,7 +296,7 @@ bibo/                           # Profile Hermes (VPS: /opt/data/profiles/bibo/)
 - **Definition of done:** znamy baseline PRZED dodaniem skilla, integracji, cachingu
 
 ### M5 — Telegram gateway + fallback ✅ (config gotowy, niewalidowany)
-- [x] config.yaml: Sonnet 4.6, prompt_cache: true, TTS Edge Neural (opt-in) — `bibo/config.yaml`
+- [x] config.yaml: Sonnet 4.6, prompt_cache: true, TTS Edge Neural (opt-in) — `config.yaml`
 - [x] `agent.fallback: claude-haiku-4-5-20251001` — emergency route gdy Sonnet down/rate-limited
 - [x] Gateway config (Telegram platform, home_channel z env var)
 - [ ] `hermes gateway start --profile bibo` (wymaga instalacji — poza zakresem tej sesji)
@@ -419,6 +430,8 @@ Przeanalizowano plan pod kątem każdej z 14 warstw z tutorialu.
 
 1. ✅ **Analiza.MD w main** — utrwalenie decyzji + walidacji
 2. ✅ **Stary kod v1.3 usunięty z main** (2026-09-21) — bez legacy branch, historia w gicie jeśli trzeba
-3. ✅ **Cały pakiet `bibo/` gotowy lokalnie** — SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking` (3 pliki), config.yaml
-4. ✅ **README.md / README.pl.md** przepisane pod instalację (opcja A: `hermes profile install`, opcja B: manualny fallback)
-5. **Teraz:** Kamil instaluje na żywym Hermesie → odblokowuje M1, M2.5, M3-test, M4-test, M5-test
+3. ✅ **Cały pakiet gotowy lokalnie** (spłaszczony do korzenia repo, nie podfolder) — SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking` (3 pliki), config.yaml
+4. ✅ **`distribution.yaml`** dodany — manifest wymagany przez `hermes profile install` (name, version, description, author)
+5. ✅ **README.md / README.pl.md** przepisane pod instalację, w tym potwierdzoną składnię `hermes profile install github.com/Grandpa1001/hi-bibo`
+6. 🔴 **Otwarty problem:** pierwszy test na żywym VPS pokazał że `hermes profile install` kopiuje pliki (potwierdzone: `ls -la` na `/opt/data/profiles/bibo/`) ale **nie rejestruje profilu** — `hermes profile list` go nie pokazuje, `hermes -p bibo chat` zwraca "Profile 'bibo' does not exist". Hipoteza: install nie znalazł `SOUL.md` w oczekiwanym miejscu bo repo miało wtedy strukturę z podfolderem `bibo/` — **naprawione spłaszczeniem, czeka na retest**.
+7. **Teraz:** Kamil pushuje spłaszczoną strukturę → retest `hermes profile install ... --force` → sprawdzić `hermes profile list`

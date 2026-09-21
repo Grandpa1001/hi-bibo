@@ -21,33 +21,46 @@ Bibo to partner do myślenia, zbudowany jako natywny profil agenta [Hermes](http
 
 ## Struktura
 
+Korzeń repo **jest** dystrybucją profilu Hermes — `distribution.yaml`
+leży obok właściwych plików profilu, dokładnie tak jak oczekuje
+`hermes profile install`.
+
 ```
-bibo/
-├── SOUL.md                  # Tożsamość — kim jest Bibo, styl, format
-├── AGENTS.md                # Reguły pracy — onboarding, trigger krytycznego myślenia, anti-sycophancy
-├── brain.template.json      # Minimalny trwały stan (imię, cel, język)
-├── skills/
-│   └── bibo-critical-thinking/
-│       ├── SKILL.md              # Warunki ładowania
-│       ├── socratic-questions.md # 5 typów pytań
-│       └── examples.md           # Przykładowe rozmowy
-└── config.yaml                # Model, fallback, gateway, cron (pusty — Bibo jest reaktywny)
+distribution.yaml          # Manifest: name, version, description, author
+SOUL.md                     # Tożsamość — kim jest Bibo, styl, format
+AGENTS.md                   # Reguły pracy — onboarding, trigger krytycznego myślenia, anti-sycophancy
+brain.template.json         # Minimalny trwały stan (imię, cel, język)
+skills/
+└── bibo-critical-thinking/
+    ├── SKILL.md              # Warunki ładowania
+    ├── socratic-questions.md # 5 typów pytań
+    └── examples.md           # Przykładowe rozmowy
+config.yaml                  # Model, fallback, gateway, cron (pusty — Bibo jest reaktywny)
 ```
+
+Reszta plików w korzeniu (`README.md`, `Analiza.MD`, `MAINTENANCE.md`,
+`CHANGELOG.md`, `LICENSE`) to dokumentacja projektu, nie treść profilu —
+Hermes je ignoruje, ale kopiuje razem z profilem przy instalacji, bo cały
+repo jest dystrybucją.
 
 ## Instalacja
 
 Wymaga działającej instalacji [Hermesa](https://github.com/NousResearch/hermes) (`hermes doctor` powinien być zielony zanim zaczniesz).
 
-**Opcja A — jeśli Twoja wersja Hermesa wspiera zdalną instalację profilu:**
 ```bash
 hermes profile install github.com/Grandpa1001/hi-bibo
 ```
 
-**Opcja B — manualna (działa z każdą wersją Hermesa):**
+Potwierdzone że działa. Jeśli reinstalujesz po wcześniejszej nieudanej
+próbie, dodaj `--force` (zachowuje dane usera już w profilu):
 ```bash
-git clone https://github.com/Grandpa1001/hi-bibo.git
-hermes profile create bibo --no-skills --description "Bibo — partner do myślenia"
-cp -r hi-bibo/bibo/* "$HERMES_HOME/profiles/bibo/"   # dopasuj HERMES_HOME do swojej instalacji
+hermes profile install github.com/Grandpa1001/hi-bibo --force
+```
+
+Zweryfikuj że profil faktycznie się zarejestrował — powinien pojawić się
+na liście, nie tylko istnieć jako pliki na dysku:
+```bash
+hermes profile list
 ```
 
 Następnie ustaw wymagane zmienne środowiskowe w `.env` profilu (albo przez `hermes secrets`):
@@ -58,13 +71,18 @@ TELEGRAM_ALLOWED_USERS=<Twoje Telegram user ID>
 ANTHROPIC_API_KEY=<Twój klucz>
 ```
 
-Zweryfikuj i uruchom:
+Przetestuj w CLI (potwierdzona składnia):
 ```bash
-hermes doctor
+hermes -p bibo chat
+```
+
+Potem uruchom gateway Telegram (dokładna składnia jeszcze niepotwierdzona —
+sprawdź `hermes gateway --help` na swojej wersji):
+```bash
 hermes gateway start --profile bibo
 ```
 
-`config.yaml` ma domyślnie `prompt_cache: true`, model główny `claude-sonnet-4-6` z fallbackiem `claude-haiku-4-5-20251001`, zero pluginów i pusty cron (Bibo tylko odpowiada — nie odpytuje w tle). Nic z tego nie zostało jeszcze uruchomione na żywym Hermesie — jeśli coś nie zgadza się z dokładnym schematem konfiguracji Twojej wersji, to jest oczekiwane na tym etapie; zgłoś issue z tym co znalazłeś.
+`config.yaml` ma domyślnie `prompt_cache: true`, model główny `claude-sonnet-4-6` z fallbackiem `claude-haiku-4-5-20251001`, zero pluginów i pusty cron (Bibo tylko odpowiada — nie odpytuje w tle). Sama instalacja/rejestracja (`hermes profile install`) jest już potwierdzona jako działająca na żywym Hermesie — dokładne klucze w `config.yaml` (nazwy modeli, `prompt_cache`, `fallback`) nie są jeszcze potwierdzone jako zgodne ze schematem Twojej wersji; zgłoś issue jeśli coś się nie sparsuje.
 
 ## Pierwszy kontakt
 

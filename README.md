@@ -21,33 +21,46 @@ Bibo is a thinking partner, built as a native [Hermes](https://github.com/NousRe
 
 ## Structure
 
+The repo root **is** the Hermes profile distribution — `distribution.yaml`
+sits next to the actual profile files, which is what `hermes profile install`
+expects.
+
 ```
-bibo/
-├── SOUL.md                 # Identity — who Bibo is, style, format
-├── AGENTS.md                # Working rules — onboarding, critical thinking trigger, anti-sycophancy
-├── brain.template.json      # Minimal persistent state (name, goal, language)
-├── skills/
-│   └── bibo-critical-thinking/
-│       ├── SKILL.md             # Trigger conditions
-│       ├── socratic-questions.md # 5 question types
-│       └── examples.md          # Sample conversations
-└── config.yaml               # Model, fallback, gateway, cron (empty — Bibo is reactive)
+distribution.yaml          # Manifest: name, version, description, author
+SOUL.md                    # Identity — who Bibo is, style, format
+AGENTS.md                  # Working rules — onboarding, critical thinking trigger, anti-sycophancy
+brain.template.json        # Minimal persistent state (name, goal, language)
+skills/
+└── bibo-critical-thinking/
+    ├── SKILL.md              # Trigger conditions
+    ├── socratic-questions.md # 5 question types
+    └── examples.md           # Sample conversations
+config.yaml                 # Model, fallback, gateway, cron (empty — Bibo is reactive)
 ```
+
+Everything else at repo root (`README.md`, `Analiza.MD`, `MAINTENANCE.md`,
+`CHANGELOG.md`, `LICENSE`) is project documentation, not profile content —
+Hermes ignores it, but it does get copied alongside the profile on install
+since the whole repo is the distribution.
 
 ## Install
 
 Requires a working [Hermes](https://github.com/NousResearch/hermes) install (`hermes doctor` should be green before you start).
 
-**Option A — if your Hermes version supports remote profile install:**
 ```bash
 hermes profile install github.com/Grandpa1001/hi-bibo
 ```
 
-**Option B — manual (works with any Hermes version):**
+Confirmed working. If you're reinstalling over a previous attempt, add
+`--force` (preserves any user data already in the profile):
 ```bash
-git clone https://github.com/Grandpa1001/hi-bibo.git
-hermes profile create bibo --no-skills --description "Bibo — thinking partner"
-cp -r hi-bibo/bibo/* "$HERMES_HOME/profiles/bibo/"   # adjust HERMES_HOME to your setup
+hermes profile install github.com/Grandpa1001/hi-bibo --force
+```
+
+Verify the profile registered correctly — it should appear in the list, not
+just exist as files on disk:
+```bash
+hermes profile list
 ```
 
 Then set the required environment variables in the profile's `.env` (or via `hermes secrets`):
@@ -58,13 +71,18 @@ TELEGRAM_ALLOWED_USERS=<your Telegram user ID>
 ANTHROPIC_API_KEY=<your key>
 ```
 
-Verify and start:
+Test in CLI first (confirmed syntax):
 ```bash
-hermes doctor
+hermes -p bibo chat
+```
+
+Then start the Telegram gateway (exact subcommand/flag not yet confirmed —
+check `hermes gateway --help` on your version):
+```bash
 hermes gateway start --profile bibo
 ```
 
-`config.yaml` ships with `prompt_cache: true`, a `claude-sonnet-4-6` main model with `claude-haiku-4-5-20251001` fallback, no plugins, and an empty cron (Bibo only responds — it doesn't poll in the background). None of this has been run against a live Hermes instance yet — if something doesn't match your Hermes version's exact config schema, that's expected at this stage; open an issue with what you found.
+`config.yaml` ships with `prompt_cache: true`, a `claude-sonnet-4-6` main model with `claude-haiku-4-5-20251001` fallback, no plugins, and an empty cron (Bibo only responds — it doesn't poll in the background). The install/registration flow (`hermes profile install`) is now confirmed working against a live Hermes instance — the exact `config.yaml` keys (model names, `prompt_cache`, `fallback`) are not yet confirmed to match your Hermes version's schema; open an issue with what you found if something doesn't parse.
 
 ## First contact
 
