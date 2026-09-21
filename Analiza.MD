@@ -1,6 +1,6 @@
 # Analiza architektury Bibo (Hermes-native rebuild)
 
-**Status:** 🟢 M2 w toku — SOUL.md + AGENTS.md + brain.template.json zbudowane lokalnie w `bibo/`  
+**Status:** 🟢 M2 + M3 zamknięte (pliki) — SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking`  
 **Data rozpoczęcia:** 2026-09-21  
 **Cel:** Kompletny plan developmentu Bibo jako natywnego agenta Hermes.
 
@@ -265,11 +265,12 @@ bibo/                           # Profile Hermes (VPS: /opt/data/profiles/bibo/)
 - [ ] Test w CLI: `hermes chat bibo` — czy Bibo brzmi jak Bibo (wymaga instalacji na Hermesie — poza zakresem tej sesji lokalnej)
 - **Definition of done:** pliki gotowe do instalacji; test CLI odłożony do momentu instalacji przez usera
 
-### M3 — Skill `bibo-critical-thinking`
-- [ ] SKILL.md z metadata + trigger conditions
-- [ ] socratic-questions.md z 5 typami pytań + 10 przykładów
-- [ ] Test: Bibo pyta o założenia gdy user deklaruje coś
-- **Definition of done:** skill ładuje się gdy trzeba, nie ładuje się przy small talk
+### M3 — Skill `bibo-critical-thinking` ✅ (pliki gotowe)
+- [x] SKILL.md z metadata (frontmatter name/description) + trigger conditions — `bibo/skills/bibo-critical-thinking/SKILL.md`
+- [x] socratic-questions.md — 5 typów pytań (założenia/powody/alternatywy/konsekwencje/perspektywa) z przykładami — `socratic-questions.md`
+- [x] examples.md — 5 pełnych wymian user→Bibo + sekcja "czego unikać" — `examples.md`
+- [ ] Test: Bibo ładuje skill i pyta trafnie (wymaga instalacji na Hermesie)
+- **Definition of done:** pliki gotowe; test ładowania odłożony do instalacji
 
 ### M4 — brain.json + onboarding flow
 - [ ] brain.json schema v2.0 (ultra-slim)
