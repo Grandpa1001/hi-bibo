@@ -1,6 +1,6 @@
 # Analiza architektury Bibo (Hermes-native rebuild)
 
-**Status:** 🟡 M1 w toku na żywo — pierwszy realny test `hermes profile install` wykrył 2 problemy: (1) profil musi być płaski w korzeniu repo, nie w podfolderze `bibo/` — **naprawione** (repo spłaszczone); (2) install kopiuje pliki ale nie rejestruje profilu w `hermes profile list` — **przyczyna nieznana, czeka na retest po spłaszczeniu**. M6/M7/M8 wydzielone do [MAINTENANCE.md](MAINTENANCE.md) jako cykliczne praktyki operacyjne.  
+**Status:** 🟡 M1 w toku na żywo — 3 realne problemy znalezione i naprawione przez iteracyjne testy + research prawdziwej dokumentacji Hermesa (`NousResearch/hermes-agent`): (1) profil musi być płaski w korzeniu repo — naprawione; (2) `config.yaml` używał całkowicie zmyślonego schematu który cicho blokował rejestrację profilu — naprawione, przepisany na minimalny/potwierdzony; (3) komenda gateway/link do repo były błędne w README — naprawione. Czeka na retest #9 poniżej. M6/M7/M8 wydzielone do [MAINTENANCE.md](MAINTENANCE.md).  
 **Data rozpoczęcia:** 2026-09-21  
 **Cel:** Kompletny plan developmentu Bibo jako natywnego agenta Hermes.
 
@@ -433,5 +433,11 @@ Przeanalizowano plan pod kątem każdej z 14 warstw z tutorialu.
 3. ✅ **Cały pakiet gotowy lokalnie** (spłaszczony do korzenia repo, nie podfolder) — SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking` (3 pliki), config.yaml
 4. ✅ **`distribution.yaml`** dodany — manifest wymagany przez `hermes profile install` (name, version, description, author)
 5. ✅ **README.md / README.pl.md** przepisane pod instalację, w tym potwierdzoną składnię `hermes profile install github.com/Grandpa1001/hi-bibo`
-6. 🔴 **Otwarty problem:** pierwszy test na żywym VPS pokazał że `hermes profile install` kopiuje pliki (potwierdzone: `ls -la` na `/opt/data/profiles/bibo/`) ale **nie rejestruje profilu** — `hermes profile list` go nie pokazuje, `hermes -p bibo chat` zwraca "Profile 'bibo' does not exist". Hipoteza: install nie znalazł `SOUL.md` w oczekiwanym miejscu bo repo miało wtedy strukturę z podfolderem `bibo/` — **naprawione spłaszczeniem, czeka na retest**.
-7. **Teraz:** Kamil pushuje spłaszczoną strukturę → retest `hermes profile install ... --force` → sprawdzić `hermes profile list`
+6. 🟡 **Diagnoza pogłębiona po spłaszczeniu:** `hermes profile install --force` po fixie #3 nadal kopiował pliki (teraz poprawnie, potwierdzone komunikatem *"will overwrite distribution-owned files only"* — Hermes rozpoznaje nasze pliki) ale **profil nadal się nie rejestrował**. `hermes profile create bibo` odmówił bo katalog już istniał (sprawdza tylko obecność folderu, nie rejestr). To wykluczyło hipotezę ze spłaszczeniem jako jedyną przyczynę.
+7. ✅ **Prawdziwa przyczyna znaleziona przez research dokumentacji Hermesa** (`github.com/NousResearch/hermes-agent`, nie `NousResearch/hermes` — zła nazwa repo w naszych wcześniejszych linkach, też poprawione):
+   - Profile są rozpoznawane **po obecności plików identyfikujących** (`SOUL.md`, `config.yaml` itd.) — nie ma osobnego rejestru
+   - Ale **`config.yaml` musi przejść walidację** żeby profil był uznany za poprawny — `profile list` parsuje go żeby pokazać kolumnę "Model"
+   - **Nasz `config.yaml` używał całkowicie zmyślonego schematu**: `agent.model` zamiast top-level `model:`, `agent.fallback` zamiast `providers.*.fallback_chain`, `plugins.enabled` (nie istnieje), `platforms.telegram` w config.yaml (Telegram konfiguruje się przez `hermes gateway setup`, nie tu), `cron.jobs` w config.yaml (cron to osobne pliki, nie klucz configu)
+   - Bardzo prawdopodobnie to właśnie nieprawidłowy `config.yaml` cicho wywalał walidację i blokował rejestrację, nawet gdy pliki fizycznie istniały
+8. ✅ **Naprawione:** `config.yaml` przepisany na minimalny, zawiera TYLKO potwierdzone klucze (`model:` top-level, `skills.auto_load: []`). Reszta (fallback_chain, dokładny format ID modelu, prompt cache) świadomie pominięta zamiast zgadywana. README zaktualizowane o poprawną komendę gatewaya (`hermes -p bibo gateway` / `hermes gateway setup`, nie `hermes gateway start --profile`) i poprawny link do repo Hermesa.
+9. **Teraz:** Kamil pushuje poprawiony `config.yaml` → retest `hermes profile install ... --force` → `hermes profile list` → `hermes -p bibo chat`

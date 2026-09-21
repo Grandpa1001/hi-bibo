@@ -35,7 +35,7 @@ skills/
     ├── SKILL.md              # Trigger conditions
     ├── socratic-questions.md # 5 question types
     └── examples.md           # Sample conversations
-config.yaml                 # Model, fallback, gateway, cron (empty — Bibo is reactive)
+config.yaml                 # Main model — minimal, only confirmed-real keys
 ```
 
 Everything else at repo root (`README.md`, `Analiza.MD`, `MAINTENANCE.md`,
@@ -45,14 +45,14 @@ since the whole repo is the distribution.
 
 ## Install
 
-Requires a working [Hermes](https://github.com/NousResearch/hermes) install (`hermes doctor` should be green before you start).
+Requires a working [Hermes Agent](https://github.com/NousResearch/hermes-agent) install (`hermes doctor` should be green before you start).
 
 ```bash
 hermes profile install github.com/Grandpa1001/hi-bibo
 ```
 
-Confirmed working. If you're reinstalling over a previous attempt, add
-`--force` (preserves any user data already in the profile):
+If you're reinstalling over a previous attempt, add `--force` (preserves
+any user data already in the profile):
 ```bash
 hermes profile install github.com/Grandpa1001/hi-bibo --force
 ```
@@ -63,7 +63,18 @@ just exist as files on disk:
 hermes profile list
 ```
 
-Then set the required environment variables in the profile's `.env` (or via `hermes secrets`):
+If it doesn't show up despite `hermes profile install` reporting success,
+that was a real bug we hit during development (see [Analiza.MD](Analiza.MD)
+for the full diagnosis) — our early `config.yaml` used a made-up schema
+that likely failed Hermes' internal validation, silently blocking
+registration. The current `config.yaml` only uses keys confirmed against
+[Hermes' actual configuration docs](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/configuration.md).
+If you still hit this, please open an issue.
+
+Set the required environment variables — per
+[Hermes' Telegram docs](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/telegram.md)
+these go in `~/.hermes/.env` (global) unless your setup uses a different
+`HERMES_HOME`:
 
 ```
 TELEGRAM_BOT_TOKEN=<token from @BotFather>
@@ -71,18 +82,20 @@ TELEGRAM_ALLOWED_USERS=<your Telegram user ID>
 ANTHROPIC_API_KEY=<your key>
 ```
 
-Test in CLI first (confirmed syntax):
+Test in CLI first:
 ```bash
 hermes -p bibo chat
 ```
 
-Then start the Telegram gateway (exact subcommand/flag not yet confirmed —
-check `hermes gateway --help` on your version):
+Then set up the Telegram gateway — either the interactive wizard (creates
+the bot and detects your user ID for you):
 ```bash
-hermes gateway start --profile bibo
+hermes gateway setup
 ```
-
-`config.yaml` ships with `prompt_cache: true`, a `claude-sonnet-4-6` main model with `claude-haiku-4-5-20251001` fallback, no plugins, and an empty cron (Bibo only responds — it doesn't poll in the background). The install/registration flow (`hermes profile install`) is now confirmed working against a live Hermes instance — the exact `config.yaml` keys (model names, `prompt_cache`, `fallback`) are not yet confirmed to match your Hermes version's schema; open an issue with what you found if something doesn't parse.
+or, if you already have a bot token and user ID set as above:
+```bash
+hermes -p bibo gateway
+```
 
 ## First contact
 
