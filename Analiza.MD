@@ -1,6 +1,6 @@
 # Analiza architektury Bibo (Hermes-native rebuild)
 
-**Status:** 🟢 M2 + M3 + M5 zamknięte (pliki) — cały pakiet `bibo/` gotowy lokalnie: SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking`, config.yaml. Blokada: M1/M2.5/M4-test/M5-test wymagają żywej instalacji Hermes (poza zakresem tej sesji).  
+**Status:** 🟢 M2 + M3 + M5 zamknięte (pliki), M6/M7/M8 wydzielone do [MAINTENANCE.md](MAINTENANCE.md) jako cykliczne praktyki operacyjne (nie build-once). Cały pakiet `bibo/` gotowy lokalnie. Blokada: M1/M2.5/M4-test/M5-test wymagają żywej instalacji Hermes (poza zakresem tej sesji).  
 **Data rozpoczęcia:** 2026-09-21  
 **Cel:** Kompletny plan developmentu Bibo jako natywnego agenta Hermes.
 
@@ -293,52 +293,26 @@ bibo/                           # Profile Hermes (VPS: /opt/data/profiles/bibo/)
 - [ ] Test scenariusza fallback (wymuszony 429)
 - **Definition of done:** plik gotowy z jawną adnotacją "niewalidowany na żywym Hermesie"; testy live odłożone do instalacji
 
-### M6 — Optymalizacja i metryki (rozbudowa, warstwa 11)
-- [ ] `hermes prompt-size` po M5 — porównanie z baseline z M2.5
-- [ ] `/usage` po tygodniu użycia — realne zużycie tokenów
-- [ ] Tuning: prompt caching w config.yaml jeśli nie jest
-- [ ] Miesięczny raport kosztów jako referencja
-- **Definition of done:** stały narzut <2k tokenów, single-turn <5k, koszt <$5/mies
+### M6, M7, M8 — przeniesione do MAINTENANCE.md
 
-### M7 — Recovery + Security (rozbudowa, warstwy 12 + 13)
-**Recovery:**
-- [ ] `hermes backup` codzienny cron (VPS-side)
-- [ ] Backup destination: **Backblaze B2 lub S3** (poza VPS!)
-- [ ] Restore drill: pełne przywrócenie na test-VPS, walidacja
-- [ ] `hermes doctor` w cyklu tygodniowym
+Optymalizacja (warstwa 11), Recovery + Security (warstwy 12+13) i
+Self-audit (warstwa 14) to praktyki **cykliczne**, nie zadania budowlane
+jednorazowe. Wyodrębnione do osobnego, żywego dokumentu:
+**[MAINTENANCE.md](MAINTENANCE.md)** ([MAINTENANCE.pl.md](MAINTENANCE.pl.md)) —
+checklisty z rekomendowanym cyklem (co tydzień / co miesiąc / co kwartał),
+w tym dokładny prompt self-audytu z tutoriala Hermesa.
 
-**Security:**
-- [ ] Sekrety w Hermes secrets store (`hermes secrets set TELEGRAM_BOT_TOKEN`)
-- [ ] Usunąć plaintext `.env` po migracji
-- [ ] `hermes security audit` — pierwszy przebieg
-- [ ] Rotacja tokenu Telegram — plan co 6 miesięcy
-- **Definition of done:** restore drill zaliczony, audit czysty
+Ten dokument (Analiza.MD) zostaje historycznym zapisem decyzji — nie
+aktualizujemy go już o postęp operacyjny po instalacji, ten żyje
+w MAINTENANCE.md.
 
-### M7.5 — Open-source ready
-- [ ] README.md z instrukcjami instalacji krok-po-kroku
-- [ ] `hermes profile install` support (github package format)
-- [ ] Przykładowa konfiguracja (bez sekretów)
+### M7.5 — Open-source ready (jednorazowe, zostaje tutaj)
+- [x] README.md / README.pl.md z instrukcjami instalacji krok-po-kroku
+- [ ] `hermes profile install` support — potwierdzić że faktycznie działa (fallback manualny już opisany w README)
+- [ ] Przykładowa konfiguracja (bez sekretów) — do dodania jeśli `config.yaml` wymaga korekt po pierwszym teście
 - [ ] LICENSE zaktualizowany
 - [ ] Zrzut ekranu / GIF pierwszej rozmowy
 - **Definition of done:** ktoś inny może zainstalować w <30 min z README
-
-### M8 — Self-audit (NOWY, warstwa 14 tutorialu)
-- [ ] Miesięczny cykl (kalendarz cron w VPS)
-- [ ] Prompt audytu (z tutoriala Hermesa):
-  ```
-  Przeprowadź audyt tej instalacji Hermesa bez wprowadzania jakichkolwiek zmian. 
-  Przeanalizuj bieżący profil, routing modeli, bazowy rozmiar promptu, pamięć 
-  i kontekst projektów, zainstalowane skills, włączone narzędzia, ostatnie błędy, 
-  logi, stan kopii zapasowych, ustawienia zatwierdzeń oraz stan aktualizacji.
-  
-  Wskaż elementy nieużywane, zduplikowane, przestarzałe, generujące zbędne 
-  koszty lub umieszczone w niewłaściwej warstwie. Oddziel zweryfikowane fakty 
-  od rekomendacji. Uporządkuj sugerowane zmiany według praktycznego wpływu 
-  i poczekaj na moją zgodę przed zmodyfikowaniem czegokolwiek.
-  ```
-- [ ] Raport zapisywany do `logs/audit-YYYY-MM.md`
-- [ ] Zmiany aplikowane manualnie po review
-- **Definition of done:** pierwszy raport self-audytu istnieje, procedura powtarzalna
 
 ---
 
@@ -445,5 +419,6 @@ Przeanalizowano plan pod kątem każdej z 14 warstw z tutorialu.
 
 1. ✅ **Analiza.MD w main** — utrwalenie decyzji + walidacji
 2. ✅ **Stary kod v1.3 usunięty z main** (2026-09-21) — bez legacy branch, historia w gicie jeśli trzeba
-3. ✅ **`bibo/` — SOUL.md, AGENTS.md, brain.template.json** (M2 częściowo zamknięty)
-4. **Dalej:** M2.5 (pomiar promptu — wymaga instalacji), M3 (skill `bibo-critical-thinking`), M4 (onboarding flow doprecyzowany), M5 (config.yaml + gateway)
+3. ✅ **Cały pakiet `bibo/` gotowy lokalnie** — SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking` (3 pliki), config.yaml
+4. ✅ **README.md / README.pl.md** przepisane pod instalację (opcja A: `hermes profile install`, opcja B: manualny fallback)
+5. **Teraz:** Kamil instaluje na żywym Hermesie → odblokowuje M1, M2.5, M3-test, M4-test, M5-test
