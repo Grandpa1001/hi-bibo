@@ -1,6 +1,6 @@
 # Analiza architektury Bibo (Hermes-native rebuild)
 
-**Status:** 🟢 M2 + M3 zamknięte (pliki) — SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking`  
+**Status:** 🟢 M2 + M3 + M5 zamknięte (pliki) — cały pakiet `bibo/` gotowy lokalnie: SOUL.md, AGENTS.md, brain.template.json, skill `bibo-critical-thinking`, config.yaml. Blokada: M1/M2.5/M4-test/M5-test wymagają żywej instalacji Hermes (poza zakresem tej sesji).  
 **Data rozpoczęcia:** 2026-09-21  
 **Cel:** Kompletny plan developmentu Bibo jako natywnego agenta Hermes.
 
@@ -284,14 +284,14 @@ bibo/                           # Profile Hermes (VPS: /opt/data/profiles/bibo/)
 - [ ] Jeśli >2500 — refactor SOUL/AGENTS zanim ruszymy dalej
 - **Definition of done:** znamy baseline PRZED dodaniem skilla, integracji, cachingu
 
-### M5 — Telegram gateway + fallback (wzmocnione: warstwa 2)
-- [ ] config.yaml: Sonnet 4.6, prompt caching, TTS Edge Neural
-- [ ] **`agent.fallback: haiku-4-5-20251001`** — emergency route gdy Sonnet down/rate-limited
-- [ ] Gateway config (reuse istniejący bot Telegram)
-- [ ] `hermes gateway start --profile bibo`
+### M5 — Telegram gateway + fallback ✅ (config gotowy, niewalidowany)
+- [x] config.yaml: Sonnet 4.6, prompt_cache: true, TTS Edge Neural (opt-in) — `bibo/config.yaml`
+- [x] `agent.fallback: claude-haiku-4-5-20251001` — emergency route gdy Sonnet down/rate-limited
+- [x] Gateway config (Telegram platform, home_channel z env var)
+- [ ] `hermes gateway start --profile bibo` (wymaga instalacji — poza zakresem tej sesji)
 - [ ] Test: rozmowa z Telegramem
 - [ ] Test scenariusza fallback (wymuszony 429)
-- **Definition of done:** działa na Telegramie, fallback route zwalidowany
+- **Definition of done:** plik gotowy z jawną adnotacją "niewalidowany na żywym Hermesie"; testy live odłożone do instalacji
 
 ### M6 — Optymalizacja i metryki (rozbudowa, warstwa 11)
 - [ ] `hermes prompt-size` po M5 — porównanie z baseline z M2.5

@@ -1,0 +1,53 @@
+# Bibo — konfiguracja profilu Hermes
+#
+# UWAGA: dokładna składnia kluczy (agent.fallback, prompt cache, itp.)
+# wymaga walidacji przy pierwszej instalacji (Analiza.MD → M1/M2.5)
+# przez `hermes config` / `hermes doctor`. Ten plik to najlepsza wiedza
+# na podstawie tutoriala Hermesa i starego config.yaml z v1.3 — nie był
+# jeszcze uruchomiony na żywym Hermesie.
+#
+# Wymagane zmienne środowiskowe (profil .env, NIE w tym pliku):
+#   TELEGRAM_BOT_TOKEN
+#   TELEGRAM_ALLOWED_USERS   (Twoje Telegram user ID)
+#   ANTHROPIC_API_KEY        (albo przez hermes secrets — patrz M7)
+
+agent:
+  model: claude-sonnet-4-6
+  fallback: claude-haiku-4-5-20251001   # emergency route — rate limit / awaria (Analiza.MD decyzja z walidacji, warstwa 2)
+  max_turns: 20
+  reasoning_effort: medium
+  prompt_cache: true                    # statyczna część (SOUL+AGENTS) cache'owana — patrz M2.5
+
+# Zero pluginów — decyzja #22, najlżejszy mechanizm rozszerzenia
+plugins:
+  enabled: []
+
+# Skill ładowany na żądanie (progressive disclosure), NIE auto_load —
+# decyzja #17. Auto-load wrzuciłby pełną treść do każdej sesji od startu.
+skills:
+  auto_load: []
+
+# TTS opcjonalny, domyślnie wyłączony — włącz tylko jeśli faktycznie
+# potrzebujesz głosu (tutorial warstwa 7: "podłączaj usługę dopiero gdy
+# staje się częścią realnego procesu")
+tts:
+  provider: edge
+  enabled: false
+  edge:
+    voice: pl-PL-ZofiaNeural
+    speed: 1.0
+
+platforms:
+  telegram:
+    enabled: true
+    home_channel:
+      platform: telegram
+      chat_id: '${TELEGRAM_ALLOWED_USERS}'
+      name: bibo
+      user_id: '${TELEGRAM_ALLOWED_USERS}'
+
+# Celowo puste — Bibo jest reaktywny (decyzja #5), zero background tick,
+# zero anti-silence loop. Jeśli w przyszłości okaże się potrzebny
+# silence-watchdog — patrz Analiza.MD "Ryzyka i mitygacja" → M9.
+cron:
+  jobs: []
