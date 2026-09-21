@@ -5,3 +5,5 @@ __pycache__/
 logs/
 *.bibo-backup
 env.bibo-backup
+hermes-tutorial.pdf
+*.backup.*.json

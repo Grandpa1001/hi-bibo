@@ -1,6 +1,15 @@
 # Changelog
 
-## V1.3 — 2026-09-17
+## Unreleased — Hermes-native rebuild (2026-09-21)
+- Full architecture rebuild — see [Analiza.MD](Analiza.MD)
+- Removed: cron/breath loop, decision slots, migration chain, custom plugin,
+  ADHD knowledge base, evolving personality, all v1.3 Python scripts
+- Added: `bibo/` package (SOUL.md, AGENTS.md, brain.template.json) —
+  reactive, minimal-memory, fixed-personality partner for critical thinking
+- Philosophy: neutral partner, not ADHD-specific; no cron; no plugin;
+  Sonnet-only; ephemeral session context via Hermes memory
+
+## V1.3 — 2026-09-17 (retired)
 - T006: phase caps in code — adaptation 3/day (1/8), partnership 6/day (1/4); T004 frequency still overrides
 - Anti-silence: >12h → `MUST_WRITE`, >24h → `silence.failure_24h`; night quiet does not block first breath
 - Decay of `zachowania_biezace` (48h half-weight, 72h archive) so stale “irritated” cannot freeze initiative
