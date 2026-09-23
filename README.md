@@ -42,6 +42,10 @@ It does not work on Pro at all.
 **Proactive messages:** tune them in `~/.hermes/local/bibo_pulse.json`, or pause them with
 `hermes cron pause bibo-pulse`.
 
+**Insight report:** `./raport.sh` shows what Bibo knows about you, token/$ usage per message, per day
+and per proactive nudge, a timeline of memory writes, and its support plan (`--opinia` asks Bibo for a full
+opinion with one model call).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

@@ -61,15 +61,16 @@ rm -rf "$HOME_DIR"/profiles/bibo.nieudana-* 2>/dev/null || true
 
 # --- 3. Tożsamość i skrypt pulsu -------------------------------------------------
 say "Wgrywam Bibo"
-if [[ -f "$HOME_DIR/SOUL.md" ]] && ! cmp -s "$HOME_DIR/SOUL.md" "$REPO/SOUL.md"; then
+# Kopia tylko nie-Bibowego SOUL.md (oryginał Hermesa) — uninstall.sh go przywraca.
+if [[ -f "$HOME_DIR/SOUL.md" ]] && [[ "$(head -1 "$HOME_DIR/SOUL.md")" != "# Bibo" ]]; then
   b="$HOME_DIR/backups/SOUL-$(date +%Y%m%d-%H%M%S).md"
   cp "$HOME_DIR/SOUL.md" "$b"; echo "Poprzedni SOUL.md → $b"
 fi
 cp "$REPO/SOUL.md" "$HOME_DIR/SOUL.md"
-cp "$REPO/scripts/bibo_pulse.py" "$HOME_DIR/scripts/bibo_pulse.py"
+cp "$REPO"/scripts/*.py "$HOME_DIR/scripts/"
 cp "$REPO/.no-bundled-skills" "$HOME_DIR/.no-bundled-skills"
 fix_owner "$HOME_DIR/SOUL.md" "$HOME_DIR/scripts" "$HOME_DIR/.no-bundled-skills" "$HOME_DIR/backups"
-echo "SOUL.md, scripts/bibo_pulse.py ✓"
+echo "SOUL.md, scripts/ (puls, raport) ✓"
 
 # Wbudowane skille Hermesa (~80) puchną w każdym zapytaniu. Usuwamy tylko
 # niezmienione; znacznik .no-bundled-skills blokuje ich powrót przy update.
@@ -178,6 +179,16 @@ elif yes "Czy Bibo ma się odzywać sam z siebie (max 3x dziennie, 8–22)?"; th
     --name "$JOB_NAME" --script bibo_pulse.py --deliver telegram \
     --failure-deliver local --continuity
   echo "Godziny, limit i strefę zmienisz w: $HOME_DIR/local/bibo_pulse.json"
+fi
+
+# Dzienne zdjęcie licznika zużycia — bez modelu (0 tokenów), nic nie wysyła.
+# Z różnic między dniami ./raport.sh liczy zużycie na dzień.
+if [[ "$jobs_out" == *"bibo-usage"* ]]; then
+  echo "Zadanie 'bibo-usage' już istnieje ✓"
+else
+  hermes cron create "55 23 * * *" --name bibo-usage --no-agent \
+    --script bibo_usage_snapshot.py --deliver local >/dev/null \
+    && echo "Dzienny licznik zużycia (bibo-usage, 23:55, 0 tokenów) ✓"
 fi
 
 # --- 8. Gateway -----------------------------------------------------------------
