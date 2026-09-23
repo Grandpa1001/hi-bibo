@@ -29,19 +29,37 @@ fi
 hv="$(hermes --version 2>&1 || true)"; echo "${hv%%$'\n'*}"
 
 # --- 2. Profil ----------------------------------------------------------------
-if hermes profile show "$PROFILE" >/dev/null 2>&1; then
+# Ścieżki liczymy sami, bez `hermes -p bibo ...`: Hermes przy starcie czyta
+# .env profilu i wywala się, jeśli ten plik jest nieczytelny (patrz fix_owner).
+HERMES_ROOT="${HERMES_HOME:-$HOME/.hermes}"
+PROFILE_DIR="$HERMES_ROOT/profiles/$PROFILE"
+TOMBSTONE="$HERMES_ROOT/profiles/.deleted/$PROFILE"
+ENV_FILE="$PROFILE_DIR/.env"
+
+# Po `hermes profile delete` zostaje znacznik profiles/.deleted/<nazwa>.
+# `profile install` go nie czyści i odmawia zapisu ("Named profile home does
+# not exist"); czyści go tylko `profile create`. Resztki nieudanej instalacji
+# odsuwamy na bok (nic nie kasujemy), tworzymy pusty profil i instalujemy
+# paczkę na nim.
+if [[ -e "$TOMBSTONE" ]]; then
+  say "Wykryto ślad po usuniętym profilu '$PROFILE' — przygotowuję czysty profil."
+  if [[ -e "$PROFILE_DIR" ]]; then
+    aside="$PROFILE_DIR.nieudana-$(date +%Y%m%d-%H%M%S)"
+    mv "$PROFILE_DIR" "$aside"
+    echo "Resztki poprzedniej próby przeniesione do: $aside"
+  fi
+  hermes profile create "$PROFILE" --no-skills
+fi
+
+if grep -qs '^source:' "$PROFILE_DIR/distribution.yaml"; then
   say "Profil '$PROFILE' istnieje — aktualizuję (pamięć, historia i .env zostają)."
   hermes profile update "$PROFILE" --force-config -y
 else
+  # Nowy profil, pusty profil z `profile create` albo resztki nieudanej instalacji.
   say "Instaluję profil '$PROFILE' z: $SOURCE"
-  hermes profile install "$SOURCE" --name "$PROFILE" --alias -y
+  force=(); [[ -e "$PROFILE_DIR" ]] && force=(--force)
+  hermes profile install "$SOURCE" --name "$PROFILE" --alias -y ${force[@]+"${force[@]}"}
 fi
-
-# Ścieżkę liczymy sami, bez `hermes -p bibo ...`: Hermes przy starcie czyta
-# .env profilu i wywala się, jeśli ten plik jest nieczytelny (patrz fix_owner).
-PROFILE_DIR="${HERMES_HOME:-$HOME/.hermes}/profiles/$PROFILE"
-[[ -d "$PROFILE_DIR" ]] || PROFILE_DIR="$(dirname "$(hermes -p "$PROFILE" config env-path)")"
-ENV_FILE="$PROFILE_DIR/.env"
 
 # W obrazie Docker Hermesa `hermes` uruchomiony jako root przełącza się na
 # użytkownika `hermes` (UID 10000). Plik, który ten skrypt zapisze jako root,
