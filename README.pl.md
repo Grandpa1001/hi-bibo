@@ -43,7 +43,7 @@ Potem po prostu napisz do swojego bota. Bibo sam Cię pozna.
 | Opcja | Ustawienie | Uwagi |
 |-------|-----------|-------|
 | **Klucz API Anthropic** (zalecane) | `ANTHROPIC_API_KEY` w `.env` | Płacisz za tokeny. Przy tym profilu: rząd kilku $ / mies. |
-| Subskrypcja Claude (OAuth) | `hermes -p bibo auth add anthropic` | **Tylko Claude Max**, zużywa wyłącznie dokupione *extra usage* — nie limit z planu. Na Pro nie działa. |
+| Konto Claude (OAuth) | `hermes -p bibo model` (logowanie + wybór modelu) | Wg dokumentacji Hermesa: **tylko Claude Max**, zużywa wyłącznie dokupione *extra usage* — nie limit z planu. Logowanie robisz osobno dla profilu `bibo`. |
 
 Domyślny model: `claude-sonnet-5`. Taniej: `hermes -p bibo config set model.default claude-haiku-4-5`.
 Zużycie sprawdzisz: `hermes -p bibo insights`.

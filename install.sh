@@ -38,7 +38,20 @@ else
 fi
 
 ENV_FILE="$(hermes -p "$PROFILE" config env-path)"
-touch "$ENV_FILE"; chmod 600 "$ENV_FILE"
+PROFILE_DIR="$(dirname "$ENV_FILE")"
+
+# W obrazie Docker Hermesa `hermes` uruchomiony jako root przełącza się na
+# użytkownika `hermes` (UID 10000). Plik, który ten skrypt zapisze jako root,
+# byłby dla Hermesa nieczytelny (PermissionError). Oddajemy go właścicielowi
+# katalogu profilu.
+fix_owner() {
+  [[ "$(id -u)" == 0 ]] || return 0
+  local owner
+  owner="$(stat -c '%u:%g' "$PROFILE_DIR" 2>/dev/null || stat -f '%u:%g' "$PROFILE_DIR")"
+  chown "$owner" "$1"
+}
+
+touch "$ENV_FILE"; chmod 600 "$ENV_FILE"; fix_owner "$ENV_FILE"
 
 get_env() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- || true; }
 set_env() {
@@ -46,7 +59,7 @@ set_env() {
   tmp="$(mktemp)"
   grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
   printf '%s=%s\n' "$key" "$val" >> "$tmp"
-  mv "$tmp" "$ENV_FILE"; chmod 600 "$ENV_FILE"
+  mv "$tmp" "$ENV_FILE"; chmod 600 "$ENV_FILE"; fix_owner "$ENV_FILE"
 }
 
 # --- 3. Telegram --------------------------------------------------------------
@@ -68,16 +81,23 @@ fi
 
 # --- 4. Model -----------------------------------------------------------------
 say "Model (Claude)"
-if [[ -z "$(get_env ANTHROPIC_API_KEY)" ]]; then
+auth_out="$(hermes -p "$PROFILE" auth list 2>/dev/null || true)"
+if [[ -z "$(get_env ANTHROPIC_API_KEY)" && "$auth_out" == *"anthropic ("* ]]; then
+  echo "Konto Anthropic w profilu: zalogowane ✓ (zmiana: hermes -p $PROFILE model)"
+elif [[ -z "$(get_env ANTHROPIC_API_KEY)" ]]; then
   cat <<'TXT'
-  1) Klucz API Anthropic  — zalecane. Płacisz za tokeny; przy tym profilu
-     to zwykle kilka dolarów miesięcznie. console.anthropic.com → API keys.
-  2) Logowanie subskrypcją Claude (OAuth) — działa TYLKO na Claude Max
-     i zużywa wyłącznie dokupione "extra usage", nie limit z planu.
-     Na Claude Pro nie działa wcale.
+  1) Klucz API Anthropic — płacisz za tokeny (console.anthropic.com → API keys).
+     Przy tym profilu zwykle kilka dolarów miesięcznie; ustaw tam limit wydatków.
+  2) Logowanie kontem Claude (OAuth) — ten sam kreator co /login i `hermes model`:
+     logujesz się i wybierasz model. Uwaga na rozliczenie (dokumentacja Hermesa):
+     wymaga Claude Max i zużywa TYLKO dokupione "extra usage", nie limit
+     z planu. Logowanie z innego profilu się nie przenosi — trzeba je
+     zrobić raz dla profilu bibo.
 TXT
   if [[ "$(ask 'Wybierz' 1)" == "2" ]]; then
-    hermes -p "$PROFILE" auth add anthropic
+    echo "W kreatorze wybierz Anthropic → logowanie kontem, potem model"
+    echo "(polecany claude-sonnet-5 albo tańszy claude-haiku-4-5)."
+    hermes -p "$PROFILE" model
   else
     set_env ANTHROPIC_API_KEY "$(asks 'ANTHROPIC_API_KEY')"
   fi
@@ -99,9 +119,13 @@ fi
 
 # --- 6. Gateway ---------------------------------------------------------------
 say "Uruchomienie"
-if yes "Zainstalować Bibo jako usługę w tle (startuje sam po restarcie)?"; then
-  hermes -p "$PROFILE" gateway install && hermes -p "$PROFILE" gateway start \
-    || echo "Nie udało się jako usługa — uruchom ręcznie: hermes -p $PROFILE gateway run"
+if yes "Uruchomić Bibo w tle (sam wstaje po restarcie)?"; then
+  # W kontenerze Docker Hermesa `gateway start` rejestruje usługę s6 (przeżywa
+  # restart kontenera). Na zwykłym serwerze start bez install się nie uda —
+  # wtedy instalujemy usługę systemd/launchd i startujemy.
+  hermes -p "$PROFILE" gateway start \
+    || { hermes -p "$PROFILE" gateway install && hermes -p "$PROFILE" gateway start; } \
+    || echo "Nie udało się w tle — uruchom ręcznie: hermes -p $PROFILE gateway run"
 else
   echo "Uruchom ręcznie: hermes -p $PROFILE gateway run"
 fi
