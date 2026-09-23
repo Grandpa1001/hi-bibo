@@ -1,4 +1,29 @@
 name: bibo
-version: "1.0.0"
-description: "Bibo — partner do myślenia. Reaktywny, minimalna pamięć, stały charakter."
+version: "0.2.0"
+description: "Bibo — partner obok Ciebie, który kuma ADHD: rozmawia, pamięta, sam się odzywa. Telegram, lekki prompt."
 author: "Grandpa1001"
+license: "MIT"
+hermes_requires: ">=0.21.0"
+
+# Kopiujemy TYLKO pliki profilu — README, docs, install.sh zostają w repo.
+distribution_owned:
+  - SOUL.md
+  - config.yaml
+  - scripts
+  - .no-bundled-skills
+  - .env.template
+  - distribution.yaml
+
+env_requires:
+  - name: TELEGRAM_BOT_TOKEN
+    description: "Token bota od @BotFather"
+    required: true
+  - name: TELEGRAM_ALLOWED_USERS
+    description: "Twoje Telegram user ID (od @userinfobot) — tylko Ty rozmawiasz z Bibo"
+    required: true
+  - name: TELEGRAM_HOME_CHANNEL
+    description: "Gdzie Bibo pisze sam z siebie — zwykle to samo ID co wyżej"
+    required: true
+  - name: ANTHROPIC_API_KEY
+    description: "Klucz API Anthropic (zalecane). Alternatywa: `hermes -p bibo auth add anthropic` (tylko Claude Max + dokupione extra usage)"
+    required: false

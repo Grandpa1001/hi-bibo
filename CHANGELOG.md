@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 — MVP: partner ADHD (2026-09-23)
+Full re-analysis in [docs/REANALIZA.md](docs/REANALIZA.md).
+- Fixed: `AGENTS.md` was never loaded by Hermes (it reads AGENTS.md from the working
+  directory, not the profile). All rules now live in `SOUL.md`.
+- Fixed: `brain.json` was read and written by nothing. It is replaced by Hermes built-in memory (`USER.md` / `MEMORY.md`).
+- Cost: Telegram/cron get only the `memory` tool (41 KB → 3.4 KB of tool schemas),
+  `.no-bundled-skills` blocks ~80 bundled skills, history compacts at ~16k tokens
+  (default 256k), background review and curator are off. The fixed prompt went from ~50–58 KB to ~13 KB.
+- New: ADHD-aware personality, proactive `bibo-pulse` cron with a zero-token gate
+  script (`scripts/bibo_pulse.py`), `install.sh` one-command installer.
+- Model: `claude-sonnet-5` via API key by default. OAuth documented as Max + extra usage only.
+- Removed: `AGENTS.md`, `brain.template.json`, `skills/bibo-critical-thinking` (folded into SOUL).
+  Old analysis and maintenance docs moved to `docs/archiwum/`.
+
 ## Unreleased — Hermes-native rebuild (2026-09-21)
 - Full architecture rebuild — see [Analiza.MD](Analiza.MD)
 - Removed: cron/breath loop, decision slots, migration chain, custom plugin,

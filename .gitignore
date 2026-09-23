@@ -7,3 +7,4 @@ logs/
 env.bibo-backup
 hermes-tutorial.pdf
 *.backup.*.json
+local/

@@ -3,125 +3,107 @@
 # Hi-Bibo 🫧
 <img width="241" height="237" alt="1789408829285" src="https://github.com/user-attachments/assets/d7844c83-35dd-4be1-8a56-99133273befa" />
 
-## Czym jest Bibo?
+**Bibo to partner obok Ciebie, który kuma ADHD.** Rozmawia z Tobą na
+Telegramie, zapamiętuje, jak działasz, i kilka razy dziennie sam się odzywa —
+jak kumpel przy biurku, a nie aplikacja z przypomnieniami.
 
-Bibo to partner do myślenia, zbudowany jako natywny profil agenta [Hermes](https://github.com/NousResearch/hermes). To nie menedżer zadań, nie coach, nie narzędzie dla ADHD — to neutralny partner dla każdego kto chce na głos przemyśleć problem.
+Zbudowany jako paczka (profil) dla [Hermes Agent](https://github.com/NousResearch/hermes-agent).
 
-**Zasady projektowe** (pełne uzasadnienie architektury w [Analiza.MD](Analiza.MD)):
-- 💬 Reaktywny — Bibo odpowiada na Ciebie, zero crona w tle
-- 🧠 Minimalna pamięć — pamięta Twoje imię, cel i język. Nic więcej nie przetrwa między sesjami.
-- 🎭 Stały charakter — bez ewoluujących cech, bez dryfu
-- 🤔 Krytyczne myślenie — kwestionuje konstruktywnie zamiast potakiwać (skill sokratejskich pytań, ładowany na żądanie)
-- 🫧 Podpis: każda wiadomość kończy się `,bibo`
-- 📱 Telegram, przez wbudowany gateway Hermesa
+- 🧠 **Pamięta Cię** — imię, cele, jak u Ciebie wygląda ADHD, co działa, co obiecałeś i kiedy
+- 💬 **Sam zaczyna rozmowę** — 1–3 razy dziennie, w ludzkich godzinach, nie gdy właśnie piszesz
+- 🧩 **Kuma ADHD** — najmniejszy krok zamiast „weź się w garść”, body doubling, bez moralizowania
+- 🪞 **Nie potakuje** — zadaje jedno dobre pytanie zamiast „super pomysł!”
+- 💸 **Lekki** — ~13 KB promptu na wiadomość (domyślny Hermes: ~50–60 KB), historia zwijana, zero zbędnych narzędzi
+- 🫧 Każda wiadomość kończy się `,bibo`
 
-## Status
-
-🚧 **Aktywny rebuild, świeżo zbudowany, jeszcze niezwalidowany na żywej instalacji Hermesa.** Poprzednia architektura oparta o cron, specyficzna dla ADHD (v1.3), została w całości wycofana. Pełny plan, wszystkie 24 decyzje i walidacja przeciw 14 warstwom tutoriala Hermesa w [Analiza.MD](Analiza.MD).
-
-## Struktura
-
-Korzeń repo **jest** dystrybucją profilu Hermes — `distribution.yaml`
-leży obok właściwych plików profilu, dokładnie tak jak oczekuje
-`hermes profile install`.
-
-```
-distribution.yaml          # Manifest: name, version, description, author
-SOUL.md                     # Tożsamość — kim jest Bibo, styl, format
-AGENTS.md                   # Reguły pracy — onboarding, trigger krytycznego myślenia, anti-sycophancy
-brain.template.json         # Minimalny trwały stan (imię, cel, język)
-skills/
-└── bibo-critical-thinking/
-    ├── SKILL.md              # Warunki ładowania
-    ├── socratic-questions.md # 5 typów pytań
-    └── examples.md           # Przykładowe rozmowy
-config.yaml                  # Model główny — minimalny, tylko potwierdzone klucze
-```
-
-Reszta plików w korzeniu (`README.md`, `Analiza.MD`, `MAINTENANCE.md`,
-`CHANGELOG.md`, `LICENSE`) to dokumentacja projektu, nie treść profilu —
-Hermes je ignoruje, ale kopiuje razem z profilem przy instalacji, bo cały
-repo jest dystrybucją.
+> Status: **MVP (v0.2)** — zweryfikowane lokalnie (instalacja, prompt, cron), czeka na test na żywym bocie.
+> Dlaczego tak, a nie inaczej: [docs/REANALIZA.md](docs/REANALIZA.md).
 
 ## Instalacja
 
-Wymaga działającej instalacji [Hermes Agent](https://github.com/NousResearch/hermes-agent) (`hermes doctor` powinien być zielony zanim zaczniesz).
+Potrzebujesz: serwera/komputera z [Hermes Agent](https://github.com/NousResearch/hermes-agent) ≥ 0.21,
+bota Telegram (od [@BotFather](https://t.me/BotFather)), swojego user ID
+(od [@userinfobot](https://t.me/userinfobot)) i klucza API Anthropic.
 
 ```bash
-hermes profile install github.com/Grandpa1001/hi-bibo
+git clone https://github.com/Grandpa1001/hi-bibo
+cd hi-bibo
+./install.sh
 ```
 
-Jeśli reinstalujesz po wcześniejszej nieudanej próbie, dodaj `--force`
-(zachowuje dane usera już w profilu):
+Instalator: instaluje profil `bibo`, pyta o token bota, Twoje ID i model,
+tworzy zadanie „pulsu” (proaktywne wiadomości) i uruchamia Bibo jako usługę
+w tle. Możesz go uruchamiać ponownie — aktualizuje profil, nie ruszając
+pamięci ani historii.
+
+Potem po prostu napisz do swojego bota. Bibo sam Cię pozna.
+
+### Model i koszty
+
+| Opcja | Ustawienie | Uwagi |
+|-------|-----------|-------|
+| **Klucz API Anthropic** (zalecane) | `ANTHROPIC_API_KEY` w `.env` | Płacisz za tokeny. Przy tym profilu: rząd kilku $ / mies. |
+| Subskrypcja Claude (OAuth) | `hermes -p bibo auth add anthropic` | **Tylko Claude Max**, zużywa wyłącznie dokupione *extra usage* — nie limit z planu. Na Pro nie działa. |
+
+Domyślny model: `claude-sonnet-5`. Taniej: `hermes -p bibo config set model.default claude-haiku-4-5`.
+Zużycie sprawdzisz: `hermes -p bibo insights`.
+
+## Panel konfiguracyjny
+
+Hermes ma wbudowany panel webowy (klucze, model, Telegram, cron, pamięć, logi):
+
 ```bash
-hermes profile install github.com/Grandpa1001/hi-bibo --force
+hermes dashboard
 ```
 
-Zweryfikuj że profil faktycznie się zarejestrował — powinien pojawić się
-na liście, nie tylko istnieć jako pliki na dysku:
+Na serwerze: `ssh -L 9119:127.0.0.1:9119 twój-serwer`, tam `hermes dashboard --no-open`,
+a u siebie otwórz http://127.0.0.1:9119.
+
+## Proaktywne wiadomości
+
+Zadanie `bibo-pulse` budzi się co godzinę, ale model odpala tylko wtedy,
+gdy darmowy skrypt `scripts/bibo_pulse.py` uzna, że to dobry moment.
+Domyślnie: 8:00–22:00, max 3 dziennie, co najmniej 3 h odstępu, nie w trakcie
+Twojej rozmowy. Zmienisz to w `~/.hermes/profiles/bibo/local/bibo_pulse.json`:
+
+```json
+{ "quiet_from": 23, "quiet_to": 9, "max_per_day": 2, "timezone": "Europe/Warsaw" }
+```
+
+Wyłączenie: `hermes -p bibo cron pause bibo-pulse`.
+
+## Co Bibo o Tobie wie
+
+Wszystko, co zapamiętał, jest w dwóch zwykłych plikach na Twoim serwerze:
+
 ```bash
-hermes profile list
+cat ~/.hermes/profiles/bibo/memories/USER.md     # kim jesteś
+cat ~/.hermes/profiles/bibo/memories/MEMORY.md   # obietnice, wzorce, wątki
 ```
 
-Jeśli mimo komunikatu sukcesu profil się nie pojawi — trafiliśmy na
-dokładnie ten bug podczas developmentu (pełna diagnoza w
-[Analiza.MD](Analiza.MD)). Nasz wcześniejszy `config.yaml` używał
-zmyślonego schematu, który najpewniej wywalał wewnętrzną walidację
-Hermesa i po cichu blokował rejestrację. Aktualny `config.yaml` używa
-tylko kluczy potwierdzonych w
-[prawdziwej dokumentacji konfiguracji Hermesa](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/configuration.md).
-Jeśli nadal to się powtórzy — zgłoś issue.
+Możesz je edytować. Nigdy nie trafiają do repozytorium. Treść rozmów
+przechodzi przez dostawcę modelu (Anthropic).
 
-Ustaw wymagane zmienne środowiskowe — wg
-[dokumentacji Telegrama Hermesa](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/telegram.md)
-idą do `~/.hermes/.env` (globalnie), chyba że Twoja instalacja ma inny
-`HERMES_HOME`:
+## Struktura
 
 ```
-TELEGRAM_BOT_TOKEN=<token od @BotFather>
-TELEGRAM_ALLOWED_USERS=<Twoje Telegram user ID>
-ANTHROPIC_API_KEY=<Twój klucz>
+SOUL.md                 # kim jest Bibo: styl, ADHD, pamięć, zaczepki, bezpieczeństwo
+config.yaml             # 1 narzędzie, kompresja historii, cache, puls — każda linia skomentowana
+scripts/bibo_pulse.py   # bramka proaktywnych wiadomości (0 tokenów)
+distribution.yaml       # manifest paczki Hermesa
+.no-bundled-skills      # blokuje ~80 wbudowanych skilli Hermesa
+.env.template           # jakie sekrety są potrzebne
+install.sh              # instalator (zostaje w repo, nie trafia do profilu)
+docs/REANALIZA.md       # analiza: co było źle, co i dlaczego zmieniono
 ```
-
-Przetestuj w CLI:
-```bash
-hermes -p bibo chat
-```
-
-Potem skonfiguruj gateway Telegram — albo interaktywny kreator (sam
-tworzy bota i wykrywa Twoje user ID):
-```bash
-hermes gateway setup
-```
-albo, jeśli masz już token bota i user ID ustawione jak wyżej:
-```bash
-hermes -p bibo gateway
-```
-
-## Pierwszy kontakt
-
-Bibo nie ma kreatora onboardingowego — sama pierwsza wymiana wiadomości JEST onboardingiem, zgodnie z `AGENTS.md`:
-1. Bibo pyta o Twoje imię.
-2. Bibo pyta nad czym chcesz pomyśleć, albo z czym się zmagasz.
-3. To wszystko — brak dalszych pytań konfiguracyjnych. Bibo zapamiętuje imię, cel i język; nic więcej nie przetrwa.
 
 ## Rozwiązywanie problemów
 
-- `hermes doctor` — sprawdza samą instalację
-- `hermes prompt-size` — pokazuje stały narzut promptu (SOUL + AGENTS); powinien zostać wyraźnie poniżej 2k tokenów wg celów z [Analiza.MD](Analiza.MD)
-- Jeśli Bibo nie ładuje skilla `bibo-critical-thinking` gdy się tego spodziewasz, sprawdź warunki ładowania w `skills/bibo-critical-thinking/SKILL.md` — ma milczeć przy small talk
-
-## Utrzymanie w dobrej kondycji
-
-Po instalacji patrz [MAINTENANCE.pl.md](MAINTENANCE.pl.md) po cykliczną
-checklistę — cotygodniowy `hermes doctor`, comiesięczne sprawdzenie kosztów
-i bezpieczeństwa, kwartalne restore drille. To bieżące utrzymanie; ten
-README pokrywa tylko start.
-
-## Współtworzenie
-
-To repo jest odbudowywane publicznie, iteracyjnie — patrz [Analiza.MD](Analiza.MD) po roadmapę i otwarte milestones. Issues i PR mile widziane, zwłaszcza raporty co się psuje na prawdziwych instalacjach Hermesa.
+- `hermes -p bibo prompt-size --platform telegram` — powinno być ~13 KB łącznie. Dużo więcej? Sprawdź `hermes -p bibo skills list` (ma być 0).
+- `hermes -p bibo cron list` i `hermes cron doctor` — czy puls żyje.
+- `hermes -p bibo logs` — co się dzieje w gatewayu.
+- Bibo „zapomina”: sprawdź `memories/USER.md`. Pamięć wczytuje się na starcie sesji — `/new` w czacie zaczyna świeżą sesję z aktualną pamięcią.
 
 ## Licencja
 
-Patrz [LICENSE](LICENSE).
+MIT — patrz [LICENSE](LICENSE).

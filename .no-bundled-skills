@@ -1,0 +1,4 @@
+This profile opted out of bundled-skill seeding.
+Bibo nie potrzebuje ~80 wbudowanych skilli Hermesa — ich indeks puchł w każdym
+zapytaniu (+8 KB). Ten znacznik blokuje ich dosianie przy `hermes update`.
+Usuń plik (albo `hermes -p bibo skills opt-in`), jeśli jednak chcesz je mieć.
