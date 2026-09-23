@@ -7,7 +7,7 @@
 on Telegram, remembers how you work, and reaches out on its own a few times a
 day, like a friend at the next desk rather than a reminder app.
 
-Packaged as a profile distribution for [Hermes Agent](https://github.com/NousResearch/hermes-agent).
+Runs on [Hermes Agent](https://github.com/NousResearch/hermes-agent): the installer turns a Hermes install into Bibo (as its main profile, so the dashboard and `/login` configure Bibo directly). Best on a dedicated Hermes instance.
 Bibo currently speaks **Polish only**.
 
 - 🧠 Remembers you: goals, how your ADHD shows up, what works, what you promised and when
@@ -39,8 +39,8 @@ It does not work on Pro at all.
 
 **Config panel:** `hermes dashboard` (on a server, tunnel it with `ssh -L 9119:127.0.0.1:9119 host`).
 
-**Proactive messages:** tune them in `~/.hermes/profiles/bibo/local/bibo_pulse.json`, or pause them with
-`hermes -p bibo cron pause bibo-pulse`.
+**Proactive messages:** tune them in `~/.hermes/local/bibo_pulse.json`, or pause them with
+`hermes cron pause bibo-pulse`.
 
 ## License
 

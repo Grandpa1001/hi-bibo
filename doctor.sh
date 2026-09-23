@@ -7,7 +7,7 @@ set -uo pipefail
 
 PROFILE="bibo"
 HERMES_ROOT="${HERMES_HOME:-$HOME/.hermes}"
-PROFILE_DIR="$HERMES_ROOT/profiles/$PROFILE"
+PROFILE_DIR="$HERMES_ROOT"   # Bibo = główny profil Hermesa
 
 sec() { printf '\n===== %s =====\n' "$*"; }
 run() { printf '$ %s\n' "$*"; out="$("$@" 2>&1)"; printf '%s\n' "$out"; }
@@ -18,12 +18,13 @@ echo "HERMES_HOME=$HERMES_ROOT  user=$(id -un) uid=$(id -u)"
 
 sec "Profile"
 run hermes profile list
-ls -la "$PROFILE_DIR" 2>&1 | head -30
-[[ -e "$HERMES_ROOT/profiles/.deleted/$PROFILE" ]] && echo "UWAGA: istnieje znacznik usunięcia profiles/.deleted/$PROFILE"
+[[ -d "$HERMES_ROOT/profiles/bibo" ]] && echo "UWAGA: istnieje stary profil profiles/bibo (poprzednia wersja instalatora)"
+echo "SOUL.md: $(head -1 "$HERMES_ROOT/SOUL.md" 2>/dev/null)"
+ls "$HERMES_ROOT/scripts" 2>&1
 
 sec "Sekrety (.env) — tylko czy ustawione"
 bot_ids=()
-for f in "$HERMES_ROOT/.env" "$PROFILE_DIR/.env"; do
+for f in "$HERMES_ROOT/.env" "$HERMES_ROOT/profiles/bibo/.env"; do
   echo "-- $f"
   if [[ -r "$f" ]]; then
     for k in TELEGRAM_BOT_TOKEN TELEGRAM_ALLOWED_USERS TELEGRAM_HOME_CHANNEL ANTHROPIC_API_KEY; do
@@ -37,23 +38,24 @@ for f in "$HERMES_ROOT/.env" "$PROFILE_DIR/.env"; do
   fi
 done
 if [[ ${#bot_ids[@]} -eq 2 && "${bot_ids[0]}" == "${bot_ids[1]}" ]]; then
-  echo "UWAGA: ten sam bot w profilu default i $PROFILE — Telegram pozwala na jeden gateway na bota."
+  echo "UWAGA: ten sam bot w profilu głównym i starym profilu bibo — usuń stary (./install.sh zaproponuje)."
 fi
 
-sec "Logowanie do modelu (profil $PROFILE)"
-run hermes -p "$PROFILE" auth list
-run hermes -p "$PROFILE" config get model
+sec "Logowanie do modelu"
+run hermes auth list
+run hermes config get model
 
 sec "Gateway"
 run hermes gateway list
-run hermes -p "$PROFILE" gateway status
+run hermes gateway status
+run hermes prompt-size --platform telegram
 
 sec "Cron"
-run hermes -p "$PROFILE" cron list --all
+run hermes cron list --all
 
-sec "Ostatnie błędy gatewaya (profil $PROFILE)"
-run hermes -p "$PROFILE" logs gateway -n 40
-run hermes -p "$PROFILE" logs errors -n 20
+sec "Ostatnie logi gatewaya"
+run hermes logs gateway -n 40
+run hermes logs errors -n 20
 
 echo
 echo "Skopiuj całość powyżej i wklej. Sekrety nie są wypisywane."

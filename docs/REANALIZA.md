@@ -64,7 +64,7 @@ w nowej jest ucinana i streszczana przy ~16 tys.
 ### B. Model i płatność
 - **Obecnie:** Sonnet 4.6 przez subskrypcję (OAuth) → extra usage → szybko pusto.
 - **Docelowo:** **klucz API Anthropic** jako ścieżka domyślna; OAuth zostaje jako opcja dla Max + extra usage. Model domyślny: `claude-sonnet-5` ($2/$10 za 1 mln tokenów — tańszy od 4.6 i lepszy), do zmiany jednym poleceniem na `claude-haiku-4-5` ($1/$5). Streszczanie historii zawsze na Haiku.
-- **Szacunek kosztu** (nie pomiar — zweryfikuj `hermes -p bibo insights` po tygodniu): ~30 wiadomości dziennie + 3 zaczepki, prompt ~4 tys. tokenów w większości z cache, historia ≤16 tys. → rząd **kilku dolarów miesięcznie** na Sonnet 5, mniej na Haiku.
+- **Szacunek kosztu** (nie pomiar — zweryfikuj `hermes insights` po tygodniu): ~30 wiadomości dziennie + 3 zaczepki, prompt ~4 tys. tokenów w większości z cache, historia ≤16 tys. → rząd **kilku dolarów miesięcznie** na Sonnet 5, mniej na Haiku.
 
 ### C. Stały prompt (to, co płacisz przy każdej wiadomości)
 - **Decyzja:** Telegram i cron dostają **jedno narzędzie: `memory`**. Bez terminala, przeglądarki, plików, skilli, delegacji.
@@ -156,17 +156,36 @@ reguł bramki). **Nie da się tego sprawdzić bez prawdziwego bota i klucza:**
 1. Czy Bibo faktycznie wywołuje `memory` sam z siebie (na Sonnet 5 powinien; na Haiku sprawdzić).
 2. Czy odpowiedź na zaczepkę trafia do tej samej rozmowy (`mirror_delivery`).
 3. Czy `[SILENT]` z pulsu nic nie wysyła.
-4. Realny koszt po tygodniu: `hermes -p bibo insights`.
-5. Czy `hermes update` na VPS respektuje `.no-bundled-skills` (`hermes -p bibo skills list` → 0).
+4. Realny koszt po tygodniu: `hermes insights`.
+5. Czy `hermes update` na VPS respektuje `.no-bundled-skills` (`hermes skills list` → 0).
 
 ## 6. Checklista wdrożenia na VPS
 
 ```bash
 hermes update                       # Hermes >= 0.21
 git clone https://github.com/Grandpa1001/hi-bibo && cd hi-bibo
-./install.sh                        # Telegram, model, puls, usługa w tle
-hermes -p bibo prompt-size --platform telegram   # oczekiwane: ~13 KB łącznie
+./install.sh                        # Bibo jako główny profil: Telegram, model, puls, restart gatewaya
+hermes prompt-size --platform telegram   # oczekiwane: ~13 KB łącznie
 ```
 
-Jeśli na serwerze jest stary profil `bibo` z 80 skillami:
-`hermes -p bibo skills opt-out --remove` (usuwa tylko niezmienione wbudowane).
+Instalator sam usuwa wbudowane skille i proponuje usunięcie starego profilu `bibo`.
+
+---
+
+## 7. Aktualizacja po pierwszym wdrożeniu (Hermes 0.21.4 w Dockerze)
+
+Pierwsze wdrożenie jako osobny profil `bibo` (`hermes profile install`)
+wyłożyło się na czterech rzeczach, których nie było widać lokalnie:
+
+| Problem | Przyczyna | Rozwiązanie |
+|---------|-----------|-------------|
+| `PermissionError` na `.env` | W obrazie Docker `hermes` uruchomiony jako root przełącza się na użytkownika `hermes` (UID 10000); plik zapisany przez root był dla niego nieczytelny | Instalator oddaje każdy zapisany plik właścicielowi katalogu Hermesa |
+| Reinstalacja po `profile delete` | Hermes zostawia znacznik `profiles/.deleted/<nazwa>`, którego `profile install` nie czyści | Zniknęło razem z trybem profilu |
+| Telegram milczy | Od 0.21.4 jest **jeden wspólny gateway** (profil default) obsługujący wszystkie profile; `-p bibo gateway start` jest odrzucany, a bot profilu nie wystartował | Bibo jest teraz **głównym profilem** |
+| Logowanie „nie idzie pod Bibo” | `/login`, panel i `hermes model` konfigurują profil default; logowania OAuth nie da się kopiować między profilami | Jw. — wszystko, co konfigurujesz, trafia do Bibo |
+
+**Decyzja:** Bibo = główny profil Hermesa na osobnej instalacji (kontenerze).
+Instalator nie nadpisuje `config.yaml`, tylko ustawia nasze klucze przez
+`hermes config set`, więc ustawienia obrazu Docker (np. `api_server`) zostają.
+`distribution.yaml` i `config.yaml` w repo zostają jako wzorzec dla kogoś,
+kto woli osobny profil.

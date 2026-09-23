@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
-# Bibo — instalator jednym poleceniem.
+# Bibo — instalator. Robi z Hermesa na tym serwerze Bibo.
 #
-#   ./install.sh                  # instaluje z GitHuba
-#   ./install.sh /ścieżka/do/repo # instaluje z lokalnego katalogu (development)
+#   ./install.sh
 #
-# Bezpieczny do ponownego uruchomienia: aktualizuje profil, nie ruszając
-# Twojej pamięci, historii ani sekretów, i nie dubluje zadania cron.
+# Bibo zostaje GŁÓWNYM (domyślnym) profilem Hermesa — bez `-p bibo`.
+# Dzięki temu wszystko, co ustawisz w panelu (`hermes dashboard`), przez
+# `/login` albo `hermes model`, trafia prosto do Bibo, a jeden gateway
+# Hermesa obsługuje jego Telegram.
+#
+# Najlepiej na osobnej instalacji Hermesa (np. osobny kontener) — Bibo
+# odchudza profil domyślny: zostawia jedno narzędzie (pamięć) na Telegramie
+# i usuwa wbudowane skille.
+#
+# Bezpieczny do ponownego uruchomienia (np. po `git pull`): nie rusza pamięci,
+# historii, logowania ani tokenów; nie dubluje zadania cron.
 set -euo pipefail
 
-SOURCE="${1:-github.com/Grandpa1001/hi-bibo}"
-PROFILE="bibo"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JOB_NAME="bibo-pulse"
 PULSE_PROMPT="Odezwij się do usera sam z siebie, zgodnie z sekcją 'Gdy odzywasz się sam' w Twojej tożsamości. Kontekst chwili (pora dnia, rodzaj impulsu) masz poniżej. Opieraj się na tym, co wiesz o userze z pamięci. Jedna krótka wiadomość albo dokładnie [SILENT]."
 
@@ -24,56 +31,81 @@ if ! command -v hermes >/dev/null 2>&1; then
   echo "  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --no-skills"
   exit 1
 fi
-# Bez `| head`: zamknięty potok wywala Hermesa (BrokenPipeError) i przy pipefail
-# zatrzymuje skrypt. Najpierw bierzemy całe wyjście, potem pierwszą linię.
+# Bez `| head`: zamknięty potok wywala Hermesa (BrokenPipeError) przy pipefail.
 hv="$(hermes --version 2>&1 || true)"; echo "${hv%%$'\n'*}"
 
-# --- 2. Profil ----------------------------------------------------------------
-# Ścieżki liczymy sami, bez `hermes -p bibo ...`: Hermes przy starcie czyta
-# .env profilu i wywala się, jeśli ten plik jest nieczytelny (patrz fix_owner).
-HERMES_ROOT="${HERMES_HOME:-$HOME/.hermes}"
-PROFILE_DIR="$HERMES_ROOT/profiles/$PROFILE"
-TOMBSTONE="$HERMES_ROOT/profiles/.deleted/$PROFILE"
-ENV_FILE="$PROFILE_DIR/.env"
-
-# Po `hermes profile delete` zostaje znacznik profiles/.deleted/<nazwa>.
-# `profile install` go nie czyści i odmawia zapisu ("Named profile home does
-# not exist"); czyści go tylko `profile create`. Resztki nieudanej instalacji
-# odsuwamy na bok (nic nie kasujemy), tworzymy pusty profil i instalujemy
-# paczkę na nim.
-if [[ -e "$TOMBSTONE" ]]; then
-  say "Wykryto ślad po usuniętym profilu '$PROFILE' — przygotowuję czysty profil."
-  if [[ -e "$PROFILE_DIR" ]]; then
-    aside="$PROFILE_DIR.nieudana-$(date +%Y%m%d-%H%M%S)"
-    mv "$PROFILE_DIR" "$aside"
-    echo "Resztki poprzedniej próby przeniesione do: $aside"
-  fi
-  hermes profile create "$PROFILE" --no-skills
-fi
-
-if grep -qs '^source:' "$PROFILE_DIR/distribution.yaml"; then
-  say "Profil '$PROFILE' istnieje — aktualizuję (pamięć, historia i .env zostają)."
-  hermes profile update "$PROFILE" --force-config -y
-else
-  # Nowy profil, pusty profil z `profile create` albo resztki nieudanej instalacji.
-  say "Instaluję profil '$PROFILE' z: $SOURCE"
-  force=(); [[ -e "$PROFILE_DIR" ]] && force=(--force)
-  hermes profile install "$SOURCE" --name "$PROFILE" --alias -y ${force[@]+"${force[@]}"}
-fi
+HOME_DIR="${HERMES_HOME:-$HOME/.hermes}"
+ENV_FILE="$HOME_DIR/.env"
+mkdir -p "$HOME_DIR/scripts" "$HOME_DIR/backups"
+echo "Katalog Hermesa: $HOME_DIR"
 
 # W obrazie Docker Hermesa `hermes` uruchomiony jako root przełącza się na
-# użytkownika `hermes` (UID 10000). Plik, który ten skrypt zapisze jako root,
-# byłby dla Hermesa nieczytelny (PermissionError). Oddajemy go właścicielowi
-# katalogu profilu — ZANIM jakiekolwiek `hermes -p bibo` go przeczyta.
-fix_owner() {
-  [[ "$(id -u)" == 0 ]] || return 0
-  local owner
-  owner="$(stat -c '%u:%g' "$PROFILE_DIR" 2>/dev/null || stat -f '%u:%g' "$PROFILE_DIR")"
-  chown "$owner" "$1"
-}
+# użytkownika `hermes`. Wszystko, co ten skrypt zapisze jako root, oddajemy
+# właścicielowi katalogu Hermesa — inaczej Hermes nie przeczyta (PermissionError).
+OWNER="$(stat -c '%u:%g' "$HOME_DIR" 2>/dev/null || stat -f '%u:%g' "$HOME_DIR")"
+fix_owner() { [[ "$(id -u)" == 0 ]] && chown -R "$OWNER" "$@" || true; }
 
+# --- 2. Stary profil `bibo` (z wcześniejszych wersji instalatora) ---------------
+OLD="$HOME_DIR/profiles/bibo"
+if [[ -d "$OLD" ]]; then
+  say "Znaleziono stary profil 'bibo' z poprzedniej wersji instalatora."
+  echo "Ma ten sam token Telegrama — dwa miejsca z jednym botem się gryzą."
+  if yes "Usunąć go (z kopią jego pamięci)?"; then
+    fix_owner "$OLD"
+    [[ -d "$OLD/memories" ]] && cp -r "$OLD/memories" "$HOME_DIR/backups/bibo-profil-pamiec-$(date +%Y%m%d-%H%M%S)"
+    hermes profile delete bibo -y || true
+    hermes profile purge-identity bibo >/dev/null 2>&1 || true
+  fi
+fi
+rm -rf "$HOME_DIR"/profiles/bibo.nieudana-* 2>/dev/null || true
+
+# --- 3. Tożsamość i skrypt pulsu -------------------------------------------------
+say "Wgrywam Bibo"
+if [[ -f "$HOME_DIR/SOUL.md" ]] && ! cmp -s "$HOME_DIR/SOUL.md" "$REPO/SOUL.md"; then
+  b="$HOME_DIR/backups/SOUL-$(date +%Y%m%d-%H%M%S).md"
+  cp "$HOME_DIR/SOUL.md" "$b"; echo "Poprzedni SOUL.md → $b"
+fi
+cp "$REPO/SOUL.md" "$HOME_DIR/SOUL.md"
+cp "$REPO/scripts/bibo_pulse.py" "$HOME_DIR/scripts/bibo_pulse.py"
+cp "$REPO/.no-bundled-skills" "$HOME_DIR/.no-bundled-skills"
+fix_owner "$HOME_DIR/SOUL.md" "$HOME_DIR/scripts" "$HOME_DIR/.no-bundled-skills" "$HOME_DIR/backups"
+echo "SOUL.md, scripts/bibo_pulse.py ✓"
+
+# Wbudowane skille Hermesa (~80) puchną w każdym zapytaniu. Usuwamy tylko
+# niezmienione; znacznik .no-bundled-skills blokuje ich powrót przy update.
+hermes skills opt-out --remove -y >/dev/null 2>&1 || true
+echo "Wbudowane skille usunięte ✓"
+
+# --- 4. Ustawienia (tylko nasze klucze; reszta config.yaml zostaje) ------------
+# Uzasadnienie każdej wartości: config.yaml w repo i docs/REANALIZA.md.
+say "Ustawienia (lekki prompt, pamięć, puls)"
+settings=(
+  "platform_toolsets.telegram=[memory]"
+  "platform_toolsets.cron=[memory]"
+  "memory.memory_enabled=true"
+  "memory.user_profile_enabled=true"
+  "memory.memory_char_limit=3000"
+  "memory.user_char_limit=2500"
+  "compression.enabled=true"
+  "compression.threshold_tokens=16000"
+  "compression.protect_last_n=12"
+  "compression.idle_compact_after_seconds=3600"
+  "prompt_caching.cache_ttl=1h"
+  "auxiliary.compression.provider=anthropic"
+  "auxiliary.compression.model=claude-haiku-4-5"
+  "auxiliary.background_review.enabled=false"
+  "curator.enabled=false"
+  "display.memory_notifications=off"
+  "cron.mirror_delivery=true"
+  "cron.wrap_response=false"
+)
+for kv in "${settings[@]}"; do
+  hermes config set "${kv%%=*}" "${kv#*=}" >/dev/null
+done
+echo "${#settings[@]} ustawień ✓"
+
+# --- 5. Telegram ---------------------------------------------------------------
 touch "$ENV_FILE"; chmod 600 "$ENV_FILE"; fix_owner "$ENV_FILE"
-
 get_env() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- || true; }
 set_env() {
   local key="$1" val="$2" tmp
@@ -83,7 +115,6 @@ set_env() {
   mv "$tmp" "$ENV_FILE"; chmod 600 "$ENV_FILE"; fix_owner "$ENV_FILE"
 }
 
-# --- 3. Telegram --------------------------------------------------------------
 say "Telegram"
 if [[ -z "$(get_env TELEGRAM_BOT_TOKEN)" ]]; then
   echo "Utwórz bota u @BotFather (/newbot) i wklej token."
@@ -100,79 +131,72 @@ else
   echo "User ID: ustawione ✓"
 fi
 
-# --- 4. Model -----------------------------------------------------------------
+# --- 6. Model ----------------------------------------------------------------
 say "Model (Claude)"
-auth_out="$(hermes -p "$PROFILE" auth list 2>/dev/null || true)"
-if [[ -z "$(get_env ANTHROPIC_API_KEY)" && "$auth_out" == *"anthropic ("* ]]; then
-  echo "Konto Anthropic w profilu: zalogowane ✓ (zmiana: hermes -p $PROFILE model)"
-elif [[ -z "$(get_env ANTHROPIC_API_KEY)" ]]; then
+has_auth() {
+  [[ -n "$(get_env ANTHROPIC_API_KEY)" ]] && return 0
+  local out; out="$(hermes auth list 2>/dev/null || true)"
+  [[ "$out" == *"anthropic ("* ]]
+}
+if has_auth; then
+  echo "Logowanie Anthropic: jest ✓  (zmiana: hermes model)"
+else
   cat <<'TXT'
-  1) Klucz API Anthropic — płacisz za tokeny (console.anthropic.com → API keys).
-     Przy tym profilu zwykle kilka dolarów miesięcznie; ustaw tam limit wydatków.
-  2) Logowanie kontem Claude (OAuth) — ten sam kreator co /login i `hermes model`:
-     logujesz się i wybierasz model. Uwaga na rozliczenie (dokumentacja Hermesa):
-     wymaga Claude Max i zużywa TYLKO dokupione "extra usage", nie limit
-     z planu. Logowanie z innego profilu się nie przenosi — trzeba je
-     zrobić raz dla profilu bibo.
+  1) Logowanie kontem Claude — kreator `hermes model` (to samo co /login):
+     logujesz się i wybierasz model. Wg dokumentacji Hermesa rozlicza się
+     z dokupionego "extra usage" na Claude Max, nie z limitu planu.
+  2) Klucz API Anthropic — płacisz za tokeny (console.anthropic.com).
 TXT
   if [[ "$(ask 'Wybierz' 1)" == "2" ]]; then
-    echo "W kreatorze wybierz Anthropic → logowanie kontem, potem model"
-    echo "(polecany claude-sonnet-5 albo tańszy claude-haiku-4-5)."
-    hermes -p "$PROFILE" model || true
-    auth_out="$(hermes -p "$PROFILE" auth list 2>/dev/null || true)"
-    if [[ "$auth_out" != *"anthropic ("* ]]; then
-      say "UWAGA: logowanie się nie zapisało — Bibo nie będzie miał modelu."
-      echo "Spróbuj: hermes -p $PROFILE auth add anthropic --type oauth --no-browser"
-      echo "(otwórz pokazany link na komputerze, zaloguj się, wklej kod z powrotem)"
-    fi
-  else
     set_env ANTHROPIC_API_KEY "$(asks 'ANTHROPIC_API_KEY')"
+  else
+    echo "W kreatorze: Anthropic → logowanie kontem → model"
+    echo "(polecany claude-sonnet-5, tańszy claude-haiku-4-5)."
+    hermes model || true
   fi
-else
-  echo "ANTHROPIC_API_KEY: ustawiony ✓"
+  if ! has_auth; then
+    say "UWAGA: logowanie się nie zapisało — Bibo nie będzie miał czym odpowiadać."
+    echo "Spróbuj: hermes auth add anthropic --type oauth --no-browser"
+    echo "(otwórz link na komputerze, zaloguj się, wklej kod) i uruchom ./install.sh ponownie."
+  fi
 fi
+model_now="$(hermes config get model.default 2>/dev/null || true)"
+if [[ -z "$model_now" || "$model_now" == "None" || "$model_now" == "null" ]]; then
+  hermes config set model.provider anthropic >/dev/null
+  hermes config set model.default claude-sonnet-5 >/dev/null
+  model_now="claude-sonnet-5"
+fi
+echo "Model: $model_now"
 
-# --- 5. Proaktywny puls -------------------------------------------------------
+# --- 7. Proaktywny puls -----------------------------------------------------------
 say "Proaktywne wiadomości"
-jobs_out="$(hermes -p "$PROFILE" cron list --all 2>/dev/null || true)"
+jobs_out="$(hermes cron list --all 2>/dev/null || true)"
 if [[ "$jobs_out" == *"$JOB_NAME"* ]]; then
   echo "Zadanie '$JOB_NAME' już istnieje ✓"
 elif yes "Czy Bibo ma się odzywać sam z siebie (max 3x dziennie, 8–22)?"; then
-  hermes -p "$PROFILE" cron create "every 1h" "$PULSE_PROMPT" \
+  hermes cron create "every 1h" "$PULSE_PROMPT" \
     --name "$JOB_NAME" --script bibo_pulse.py --deliver telegram \
     --failure-deliver local --continuity
-  echo "Godziny, limit i strefę zmienisz w: $(dirname "$ENV_FILE")/local/bibo_pulse.json"
+  echo "Godziny, limit i strefę zmienisz w: $HOME_DIR/local/bibo_pulse.json"
 fi
 
-# --- 6. Gateway ---------------------------------------------------------------
-say "Uruchomienie"
-if yes "Uruchomić Bibo w tle (sam wstaje po restarcie)?"; then
-  # Hermes >= 0.21.4 domyślnie działa jako JEDEN wspólny gateway (profil
-  # default), który obsługuje wszystkie profile — `-p bibo gateway start` jest
-  # wtedy odrzucany. Bot Bibo z .env łapie się po restarcie wspólnego gatewaya.
-  # Starsze/standalone: start (s6 w Dockerze) albo install+start (systemd/launchd).
-  gw_out="$(hermes -p "$PROFILE" gateway start 2>&1)" && gw_ok=1 || gw_ok=0
-  echo "$gw_out"
-  if [[ $gw_ok == 0 && "$gw_out" == *"does not get a gateway of its own"* ]]; then
-    say "Wspólny gateway Hermesa obsługuje też Bibo — restartuję go, żeby podłapał bota."
-    echo "(Na chwilę rozłączy wszystkie boty na tym serwerze.)"
-    hermes gateway restart || hermes gateway start \
-      || echo "Uruchom wspólny gateway ręcznie: hermes gateway restart"
-  elif [[ $gw_ok == 0 ]]; then
-    { hermes -p "$PROFILE" gateway install && hermes -p "$PROFILE" gateway start; } \
-      || echo "Nie udało się w tle — uruchom ręcznie: hermes -p $PROFILE gateway run"
-  fi
+# --- 8. Gateway -----------------------------------------------------------------
+say "Uruchamiam Bibo"
+if hermes gateway restart; then
+  echo "Gateway zrestartowany ✓"
 else
-  echo "Uruchom ręcznie: hermes -p $PROFILE gateway run"
+  hermes gateway start \
+    || { hermes gateway install && hermes gateway start; } \
+    || echo "Nie udało się w tle — uruchom ręcznie: hermes gateway run"
 fi
 
 say "Gotowe 🫧"
 cat <<TXT
   • Napisz do swojego bota na Telegramie — Bibo sam Cię pozna.
-  • Test w terminalu:      $PROFILE chat
-  • Koszt promptu:         hermes -p $PROFILE prompt-size --platform telegram
-  • Zużycie:               hermes -p $PROFILE insights
-  • Panel konfiguracji:    hermes dashboard
+  • Stan:                 ./doctor.sh
+  • Koszt promptu:        hermes prompt-size --platform telegram   (~13 KB)
+  • Zużycie:              hermes insights
+  • Panel konfiguracji:   hermes dashboard
       (na serwerze: ssh -L 9119:127.0.0.1:9119 <serwer>, potem
        'hermes dashboard --no-open' i otwórz http://127.0.0.1:9119)
 TXT
