@@ -1,38 +1,66 @@
-# Bibo — konfiguracja profilu Hermes
+# Bibo — konfiguracja profilu Hermes (MVP)
 #
-# POPRAWIONE 2026-09-21 po realnym teście instalacji: pierwsza wersja tego
-# pliku używała zmyślonego schematu (agent.model, plugins.enabled,
-# platforms.telegram, cron.jobs) i bardzo prawdopodobnie to ona psuła
-# rejestrację profilu w Hermesie (walidacja config.yaml się wywalała).
-# Zweryfikowano przeciw prawdziwej dokumentacji:
-# https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/configuration.md
+# Każda sekcja tu istnieje z jednego powodu: KOSZT i PRZEWIDYWALNOŚĆ.
+# Klucze sprawdzone z dokumentacją Hermesa (website/docs/user-guide/configuration.md)
+# i zmierzone `hermes prompt-size --platform telegram`. Pomiary: docs/REANALIZA.md.
 #
-# Trzymamy tylko klucze POTWIERDZONE w dokumentacji. Reszta (fallback_chain,
-# dokładny format ID modelu, prompt cache) zostaje pominięta świadomie —
-# lepiej mniej niż znowu zgadnięty klucz psujący walidację.
+# Uwaga: `hermes profile update` NIE nadpisuje tego pliku (chroni Twoje zmiany).
+# Żeby wciągnąć nową wersję: `hermes profile update bibo --force-config`.
 
-model: anthropic/claude-sonnet-4-6
-# UWAGA: dokładny identyfikator modelu (czy potrzebuje sufiksu daty, jak
-# `claude-opus-4-5-20251101` widoczne w `hermes profile list` dla profilu
-# `default`) — do zweryfikowania na żywym Hermesie: `hermes model` albo
-# `hermes profile show default` pokaże prawdziwy, działający format.
+model:
+  provider: anthropic
+  default: claude-sonnet-5          # $2/$10 za 1M tok. Taniej: claude-haiku-4-5 ($1/$5).
 
-skills:
-  auto_load: []
-  # Skill bibo-critical-thinking ładowany na żądanie (progressive
-  # disclosure), NIE tutaj — decyzja #17 w Analiza.MD.
+# --- Narzędzia: tylko pamięć. -----------------------------------------------
+# Domyślnie Telegram dostaje ~24 narzędzia (terminal, przeglądarka, pliki,
+# delegacja...) = ~41 KB schematów JSON w KAŻDYM zapytaniu. Bibo rozmawia
+# i pamięta — nic więcej nie potrzebuje.
+platform_toolsets:
+  telegram: [memory]
+  cron: [memory]
+  cli: [memory]
 
-# Celowo BRAK sekcji: plugins, platforms.telegram, cron, agent.fallback.
-# Powód dla każdej:
-#   plugins        — zero pluginów (decyzja #22); dokumentacja nie
-#                    potwierdza top-level klucza `plugins`, nie zgadujemy.
-#   platforms      — Telegram konfiguruje się przez `hermes gateway setup`
-#                    (interaktywnie) + zmienne środowiskowe, NIE tutaj.
-#                    Patrz README → sekcja Instalacja.
-#   cron           — zadania cron to osobne pliki w profilu, nie klucz
-#                    w config.yaml. Bibo i tak jest reaktywny (decyzja #5)
-#                    — nie tworzymy żadnych.
-#   agent.fallback — prawdziwy mechanizm to `providers.<id>` +
-#                    `providers.fallback.fallback_chain`, znacznie
-#                    bardziej złożony niż zakładaliśmy. Odłożone do
-#                    czasu gdy będzie można to przetestować na żywo.
+# --- Pamięć wbudowana (USER.md + MEMORY.md, wstrzykiwane do promptu). --------
+# Lekko podniesione limity, bo zbieranie wiedzy o userze to rdzeń produktu.
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 3000           # ~1.1k tok — obietnice, wzorce, wątki
+  user_char_limit: 2500             # ~0.9k tok — profil usera
+
+# --- Rozmowa na Telegramie nie wygasa sama. ---------------------------------
+# Bez tego historia rośnie do 256k tokenów zanim Hermes ją skompresuje,
+# a każda wiadomość wysyła CAŁĄ historię. To zjadało limit po 2-3 wiadomościach.
+compression:
+  enabled: true
+  threshold_tokens: 16000           # kompresuj, gdy kontekst > ~16k tok
+  protect_last_n: 12                # zostaw ostatnie ~6 wymian dosłownie
+  idle_compact_after_seconds: 3600  # po godzinie ciszy — zwiń historię przed odpowiedzią
+
+# Cache promptu: rozmowy z przerwami > 5 min, więc 1h się opłaca.
+prompt_caching:
+  cache_ttl: "1h"
+
+auxiliary:
+  # Streszczanie historii — tani model wystarczy.
+  compression:
+    provider: anthropic
+    model: claude-haiku-4-5
+  # "Self-improvement review" odpala po turach osobne wywołanie z CAŁĄ rozmową
+  # (limit domyślny: do 120k+ tokenów na jeden przegląd). Bibo zapisuje pamięć
+  # sam w trakcie rozmowy (SOUL.md), więc wyłączamy.
+  background_review:
+    enabled: false
+
+# Kurator skilli — Bibo nie ma skilli do kuratorowania.
+curator:
+  enabled: false
+
+display:
+  memory_notifications: off         # bez "💾 Memory updated" w czacie
+
+# Proaktywne wiadomości (cron) — odpowiedź na zaczepkę Bibo trafia
+# do tej samej rozmowy, więc Bibo wie, na co odpisujesz.
+cron:
+  mirror_delivery: true
+  wrap_response: false              # bez nagłówka "Cron job ..." — ma brzmieć jak wiadomość
