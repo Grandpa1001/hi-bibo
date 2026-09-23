@@ -37,13 +37,16 @@ else
   hermes profile install "$SOURCE" --name "$PROFILE" --alias -y
 fi
 
-ENV_FILE="$(hermes -p "$PROFILE" config env-path)"
-PROFILE_DIR="$(dirname "$ENV_FILE")"
+# Ścieżkę liczymy sami, bez `hermes -p bibo ...`: Hermes przy starcie czyta
+# .env profilu i wywala się, jeśli ten plik jest nieczytelny (patrz fix_owner).
+PROFILE_DIR="${HERMES_HOME:-$HOME/.hermes}/profiles/$PROFILE"
+[[ -d "$PROFILE_DIR" ]] || PROFILE_DIR="$(dirname "$(hermes -p "$PROFILE" config env-path)")"
+ENV_FILE="$PROFILE_DIR/.env"
 
 # W obrazie Docker Hermesa `hermes` uruchomiony jako root przełącza się na
 # użytkownika `hermes` (UID 10000). Plik, który ten skrypt zapisze jako root,
 # byłby dla Hermesa nieczytelny (PermissionError). Oddajemy go właścicielowi
-# katalogu profilu.
+# katalogu profilu — ZANIM jakiekolwiek `hermes -p bibo` go przeczyta.
 fix_owner() {
   [[ "$(id -u)" == 0 ]] || return 0
   local owner
