@@ -72,6 +72,15 @@ cp "$REPO/.no-bundled-skills" "$HOME_DIR/.no-bundled-skills"
 fix_owner "$HOME_DIR/SOUL.md" "$HOME_DIR/scripts" "$HOME_DIR/.no-bundled-skills" "$HOME_DIR/backups"
 echo "SOUL.md, scripts/ (puls, raport) ✓"
 
+# Podpis "bibo" dokleja wtyczka (hook transform_llm_output), nie model.
+mkdir -p "$HOME_DIR/plugins"
+rm -rf "$HOME_DIR/plugins/bibo-podpis"
+cp -r "$REPO/plugins/bibo-podpis" "$HOME_DIR/plugins/bibo-podpis"
+fix_owner "$HOME_DIR/plugins"
+hermes plugins enable bibo-podpis --no-allow-tool-override >/dev/null 2>&1 \
+  && echo "Wtyczka podpisu (bibo-podpis) ✓" \
+  || echo "UWAGA: włącz wtyczkę ręcznie: hermes plugins enable bibo-podpis"
+
 # Wbudowane skille Hermesa (~80) puchną w każdym zapytaniu. Usuwamy tylko
 # niezmienione; znacznik .no-bundled-skills blokuje ich powrót przy update.
 hermes skills opt-out --remove -y >/dev/null 2>&1 || true
@@ -99,6 +108,8 @@ settings=(
   "display.memory_notifications=off"
   "cron.mirror_delivery=true"
   "cron.wrap_response=false"
+  # Wiadomość w jednym kawałku — podpis doklejany na końcu musi trafić do wysłanej treści.
+  "streaming.enabled=false"
 )
 for kv in "${settings[@]}"; do
   hermes config set "${kv%%=*}" "${kv#*=}" >/dev/null

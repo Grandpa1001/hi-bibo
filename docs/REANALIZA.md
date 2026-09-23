@@ -12,7 +12,7 @@
 | # | Wymaganie | Jak sprawdzimy, że działa |
 |---|-----------|---------------------------|
 | 1 | Partner obok, który **kuma ADHD** | Proponuje mały krok zamiast „po prostu zacznij”, nie moralizuje |
-| 2 | **Trzyma parametry** (styl, długość, charakter) | Krótkie wiadomości, `,bibo`, zero „Super pomysł!” — też po tygodniu |
+| 2 | **Trzyma parametry** (styl, długość, charakter) | Krótkie wiadomości, podpis „bibo”, zero „Super pomysł!” — też po tygodniu |
 | 3 | **Zbiera informacje o Tobie** | Po tygodniu `memories/USER.md` opisuje Cię trafnie |
 | 4 | **Sam się odzywa**, symuluje rozmowę | 1–3 zaczepki dziennie, nawiązujące do Twoich spraw; odpowiedź ciągnie wątek |
 | 5 | **Tani** — limit nie znika po 2–3 wiadomościach | Stały prompt < 5 tys. tokenów; koszt miesięczny w dolarach jednocyfrowych |
@@ -90,7 +90,7 @@ w nowej jest ucinana i streszczana przy ~16 tys.
 
 ### G. Osobowość i ADHD
 - **Obecnie:** „neutralny partner do myślenia, nie ADHD”.
-- **Docelowo:** kumpel, który rozumie ADHD od środka: problem z uruchamianiem, ślepota czasowa, układ nerwowy napędzany zainteresowaniem, hiperfokus, wrażliwość na odrzucenie; narzędzia typu najmniejszy krok, 10 minut, body doubling. Zostaje: anti-sycophancy, krótkie wiadomości, `,bibo`, jedno pytanie naraz, bezpieczeństwo (116 123 / 800 70 2222 / 112).
+- **Docelowo:** kumpel, który rozumie ADHD od środka: problem z uruchamianiem, ślepota czasowa, układ nerwowy napędzany zainteresowaniem, hiperfokus, wrażliwość na odrzucenie; narzędzia typu najmniejszy krok, 10 minut, body doubling. Zostaje: anti-sycophancy, krótkie wiadomości, podpis „bibo” (doklejany wtyczką `bibo-podpis`), jedno pytanie naraz, bezpieczeństwo (116 123 / 800 70 2222 / 112).
 
 ### H. Panel konfiguracyjny
 - **Decyzja: nie budujemy własnego.** Hermes ma `hermes dashboard` (klucze, modele, Telegram/pairing, cron, sesje, pamięć, logi, wiele profili). Na VPS: tunel SSH `ssh -L 9119:127.0.0.1:9119 serwer` → `hermes dashboard --no-open`. Własny panel to miesiące pracy i powierzchnia ataku, a nic nie wnosi na tym etapie.

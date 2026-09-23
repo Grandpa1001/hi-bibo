@@ -14,7 +14,7 @@ Działa na [Hermes Agent](https://github.com/NousResearch/hermes-agent) — inst
 - 🧩 **Kuma ADHD** — najmniejszy krok zamiast „weź się w garść”, body doubling, bez moralizowania
 - 🪞 **Nie potakuje** — zadaje jedno dobre pytanie zamiast „super pomysł!”
 - 💸 **Lekki** — ~13 KB promptu na wiadomość (domyślny Hermes: ~50–60 KB), historia zwijana, zero zbędnych narzędzi
-- 🫧 Każda wiadomość kończy się `,bibo`
+- 🫧 Każda wiadomość kończy się podpisem „bibo” — doklejanym przez wtyczkę, nie przez model
 
 > Status: **MVP (v0.2)** — zweryfikowane lokalnie (instalacja, prompt, cron), czeka na test na żywym bocie.
 > Dlaczego tak, a nie inaczej: [docs/REANALIZA.md](docs/REANALIZA.md).
@@ -117,6 +117,7 @@ zdjęcia licznika). Pamięć można też podejrzeć i edytować przez
 SOUL.md                 # kim jest Bibo: styl, ADHD, pamięć, zaczepki, bezpieczeństwo
 config.yaml             # 1 narzędzie, kompresja historii, cache, puls — każda linia skomentowana
 scripts/bibo_pulse.py   # bramka proaktywnych wiadomości (0 tokenów)
+plugins/bibo-podpis/    # dokleja „bibo” na końcu wiadomości (kodem, nie modelem)
 distribution.yaml       # manifest paczki Hermesa
 .no-bundled-skills      # blokuje ~80 wbudowanych skilli Hermesa
 .env.template           # jakie sekrety są potrzebne
