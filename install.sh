@@ -24,7 +24,9 @@ if ! command -v hermes >/dev/null 2>&1; then
   echo "  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --no-skills"
   exit 1
 fi
-hermes --version | head -1
+# Bez `| head`: zamknięty potok wywala Hermesa (BrokenPipeError) i przy pipefail
+# zatrzymuje skrypt. Najpierw bierzemy całe wyjście, potem pierwszą linię.
+hv="$(hermes --version 2>&1 || true)"; echo "${hv%%$'\n'*}"
 
 # --- 2. Profil ----------------------------------------------------------------
 if hermes profile show "$PROFILE" >/dev/null 2>&1; then
@@ -85,7 +87,8 @@ fi
 
 # --- 5. Proaktywny puls -------------------------------------------------------
 say "Proaktywne wiadomości"
-if hermes -p "$PROFILE" cron list --all 2>/dev/null | grep -q "$JOB_NAME"; then
+jobs_out="$(hermes -p "$PROFILE" cron list --all 2>/dev/null || true)"
+if [[ "$jobs_out" == *"$JOB_NAME"* ]]; then
   echo "Zadanie '$JOB_NAME' już istnieje ✓"
 elif yes "Czy Bibo ma się odzywać sam z siebie (max 3x dziennie, 8–22)?"; then
   hermes -p "$PROFILE" cron create "every 1h" "$PULSE_PROMPT" \
