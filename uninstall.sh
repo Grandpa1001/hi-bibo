@@ -21,6 +21,11 @@ say "Zadanie cron"
 hermes cron remove bibo-pulse 2>/dev/null && echo "bibo-pulse usunięte ✓" || echo "(nie było)"
 rm -f "$HOME_DIR/scripts/bibo_pulse.py"
 
+hermes cron remove bibo-usage 2>/dev/null || true
+rm -f "$HOME_DIR/scripts/bibo_raport.py" "$HOME_DIR/scripts/bibo_usage_snapshot.py"
+hermes plugins disable bibo-podpis >/dev/null 2>&1 || true
+rm -rf "$HOME_DIR/plugins/bibo-podpis"
+
 say "Tożsamość"
 last="$(ls -t "$HOME_DIR"/backups/SOUL-*.md 2>/dev/null | head -1 || true)"
 if [[ -n "$last" ]]; then

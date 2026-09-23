@@ -1,0 +1,3 @@
+name: bibo-podpis
+version: "1.0"
+description: "Dopisuje 'bibo' na końcu każdej wiadomości Bibo (Telegram i zaczepki z crona) — kodem, bez udziału modelu."
