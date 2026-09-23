@@ -92,6 +92,25 @@ cat ~/.hermes/memories/MEMORY.md   # obietnice, wzorce, wątki
 Możesz je edytować. Nigdy nie trafiają do repozytorium. Treść rozmów
 przechodzi przez dostawcę modelu (Anthropic).
 
+## Analiza: co wie, ile kosztuje, jak się uczy
+
+```bash
+./raport.sh             # 0 tokenów — tylko lokalne dane Hermesa
+./raport.sh --opinia    # + opinia Bibo o Tobie i plan wsparcia (1 wywołanie modelu)
+```
+
+| Sekcja | Co pokazuje | Skąd |
+|--------|-------------|------|
+| a) Co zebrał | Twój profil i notatki Bibo, % zapełnienia pamięci | `memories/USER.md`, `MEMORY.md` |
+| b) Zużycie | tokeny i $ łącznie (rozmowa / zaczepki / streszczanie), na wiadomość, na dzień, na każdą zaczepkę | `state.db` + nocne zdjęcie licznika (`bibo-usage`, 0 tokenów) |
+| c) Nauka | oś czasu zapisów do pamięci: co dodał, poprawił, usunął | historia wywołań narzędzia `memory` |
+| d) Opinia i plan | wpis `PLAN:` z pamięci; z `--opinia` — pełna opinia i plan na 2 tygodnie | pamięć + 1 zapytanie do Bibo |
+
+Koszt w $ to wycena Hermesa albo — przy logowaniu kontem Claude — szacunek
+wg cennika API. Zużycie na dzień pojawia się od drugiego dnia (potrzebne dwa
+zdjęcia licznika). Pamięć można też podejrzeć i edytować przez
+`hermes journey` albo w panelu. W czacie wystarczy zapytać Bibo „co o mnie wiesz?”.
+
 ## Struktura
 
 ```
@@ -104,6 +123,8 @@ distribution.yaml       # manifest paczki Hermesa
 install.sh              # instalator: Bibo jako główny profil Hermesa
 uninstall.sh            # wyłącza Bibo (pamięć zostaje)
 doctor.sh               # diagnostyka do wklejenia, bez sekretów
+raport.sh               # raport: dane, zużycie, nauka, plan
+scripts/bibo_raport.py  # silnik raportu (+ bibo_usage_snapshot.py dla crona)
 docs/REANALIZA.md       # analiza: co było źle, co i dlaczego zmieniono
 ```
 
