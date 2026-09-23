@@ -116,6 +116,16 @@ for kv in "${settings[@]}"; do
 done
 echo "${#settings[@]} ustawień ✓"
 
+# Niski poziom rozumowania — do rozmowy wystarczy, szybciej i taniej. Tylko gdy
+# nieustawiony (nie nadpisujemy Twojego wyboru). --force: gateway czyta ten
+# klucz, ale `config set` nie ma go na liście znanych i ostrzega bez potrzeby.
+effort="$(hermes config get agent.reasoning_effort 2>/dev/null || true)"
+if [[ -z "$effort" || "$effort" == "None" || "$effort" == "null" ]]; then
+  hermes config set --force agent.reasoning_effort low >/dev/null 2>&1 || true
+  effort="low"
+fi
+echo "Poziom rozumowania: $effort"
+
 # --- 5. Telegram ---------------------------------------------------------------
 touch "$ENV_FILE"; chmod 600 "$ENV_FILE"; fix_owner "$ENV_FILE"
 get_env() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- || true; }
