@@ -118,7 +118,13 @@ TXT
   if [[ "$(ask 'Wybierz' 1)" == "2" ]]; then
     echo "W kreatorze wybierz Anthropic → logowanie kontem, potem model"
     echo "(polecany claude-sonnet-5 albo tańszy claude-haiku-4-5)."
-    hermes -p "$PROFILE" model
+    hermes -p "$PROFILE" model || true
+    auth_out="$(hermes -p "$PROFILE" auth list 2>/dev/null || true)"
+    if [[ "$auth_out" != *"anthropic ("* ]]; then
+      say "UWAGA: logowanie się nie zapisało — Bibo nie będzie miał modelu."
+      echo "Spróbuj: hermes -p $PROFILE auth add anthropic --type oauth --no-browser"
+      echo "(otwórz pokazany link na komputerze, zaloguj się, wklej kod z powrotem)"
+    fi
   else
     set_env ANTHROPIC_API_KEY "$(asks 'ANTHROPIC_API_KEY')"
   fi
@@ -141,12 +147,21 @@ fi
 # --- 6. Gateway ---------------------------------------------------------------
 say "Uruchomienie"
 if yes "Uruchomić Bibo w tle (sam wstaje po restarcie)?"; then
-  # W kontenerze Docker Hermesa `gateway start` rejestruje usługę s6 (przeżywa
-  # restart kontenera). Na zwykłym serwerze start bez install się nie uda —
-  # wtedy instalujemy usługę systemd/launchd i startujemy.
-  hermes -p "$PROFILE" gateway start \
-    || { hermes -p "$PROFILE" gateway install && hermes -p "$PROFILE" gateway start; } \
-    || echo "Nie udało się w tle — uruchom ręcznie: hermes -p $PROFILE gateway run"
+  # Hermes >= 0.21.4 domyślnie działa jako JEDEN wspólny gateway (profil
+  # default), który obsługuje wszystkie profile — `-p bibo gateway start` jest
+  # wtedy odrzucany. Bot Bibo z .env łapie się po restarcie wspólnego gatewaya.
+  # Starsze/standalone: start (s6 w Dockerze) albo install+start (systemd/launchd).
+  gw_out="$(hermes -p "$PROFILE" gateway start 2>&1)" && gw_ok=1 || gw_ok=0
+  echo "$gw_out"
+  if [[ $gw_ok == 0 && "$gw_out" == *"does not get a gateway of its own"* ]]; then
+    say "Wspólny gateway Hermesa obsługuje też Bibo — restartuję go, żeby podłapał bota."
+    echo "(Na chwilę rozłączy wszystkie boty na tym serwerze.)"
+    hermes gateway restart || hermes gateway start \
+      || echo "Uruchom wspólny gateway ręcznie: hermes gateway restart"
+  elif [[ $gw_ok == 0 ]]; then
+    { hermes -p "$PROFILE" gateway install && hermes -p "$PROFILE" gateway start; } \
+      || echo "Nie udało się w tle — uruchom ręcznie: hermes -p $PROFILE gateway run"
+  fi
 else
   echo "Uruchom ręcznie: hermes -p $PROFILE gateway run"
 fi
