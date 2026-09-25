@@ -291,7 +291,22 @@ def weryfikuj_init_data(raw: str, token: str, max_wiek: int = 3600) -> dict:
 
 ## 12. Wyniki spike'u M0
 
-_Uzupełniamy po M0: co zadziałało, co wymagało obejścia, wersja Hermesa._
+**Wynik: M0 zaliczony (25.09.2026).** Hermes 0.21 w Dockerze (VPS), wtyczka `bibo-tryby` 0.0.1.
+Wszystkie testy ze strony diagnostycznej zwróciły 200, a karta, przycisk i odpowiedź Bibo pokazały się w czacie.
+
+| # | Wynik | Jak zrobione (do użycia w M1–M4) |
+|---|-------|----------------------------------|
+| 0.1 | ✅ | `register_auxiliary_task("bibo_tryby", defaults={provider, model})` + `call_llm(task=…)` w `run_in_executor` |
+| 0.2 | ✅ | `_HERMES_GATEWAY == "1"` **i** `gateway.status.get_running_pid() == os.getpid()` (ten sam test co Hermes); wątek startowy czeka do 180 s — usługi ruszają bez pierwszej wiadomości |
+| 0.3 | ✅ | `cloudflared` z `$HERMES_HOME/bin`, `start_new_session=True`, adres regexem z stderr, restart z backoffem 5 → 300 s |
+| 0.4 | ✅ | Bot API bezpośrednio (`aiohttp`), `setChatMenuButton` bez `chat_id` = dla wszystkich czatów prywatnych; `style` z fallbackiem bez niego |
+| 0.5 | ✅ | `gateway.run._gateway_runner_ref()` → `runner._gateway_loop` + `runner.adapters[Platform.TELEGRAM]`; `run_coroutine_threadsafe(adapter.handle_message(MessageEvent(internal=True)))`; źródło: zapamiętane z `pre_gateway_dispatch` albo `SessionSource(dm)` z user id; fallback `notatki.json` → `pre_llm_call` |
+| 0.6 | ✅ częściowo | `bibo-podpis` usuwa `[[nazwa:wartosc]]` (testy jednostkowe); wykrycie w `post_llm_call` gotowe — pełny test z instrukcją propozycji w M4 |
+| 0.7 | ✅ | `sendPhoto` multipart + `message_effect_id` `5046509860389126442` (🎉), fallback bez efektu |
+
+Dodatkowo: obie wtyczki deklarują `provides_hooks` i przechodzą `hermes plugins validate`
+(ostrzeżenie `tunnel_service` jest oczekiwane). Testy: `python -m unittest discover -s tests/bibo_tryby`.
+Instalacja ręczna na VPS (do czasu M4): paczka `main.tar.gz` z GitHuba zamiast `git pull` — katalog w kontenerze nie jest repozytorium.
 
 ## 13. Poza MVP (bez projektowania teraz)
 
