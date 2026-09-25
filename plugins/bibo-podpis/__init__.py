@@ -8,6 +8,10 @@ Nie podpisujemy:
 - odpowiedzi „ciszy” ([SILENT], NO_REPLY...) — inaczej cron uznałby
   „[SILENT] bibo” za treść i wysłał pustą zaczepkę;
 - niczego poza Telegramem i cronem (np. `./raport.sh --opinia` w terminalu).
+
+Przed podpisem usuwamy znaczniki sterujące innych wtyczek (np. `[[tryb:detektyw]]`
+z `bibo-tryby`). `transform_llm_output` bierze tylko pierwszą podmianę tekstu,
+więc sprzątanie musi być tutaj, a nie w drugiej wtyczce.
 """
 from __future__ import annotations
 
@@ -19,6 +23,8 @@ PLATFORMS = {"telegram", "cron"}
 
 # Podpis, który model mógł dopisać z przyzwyczajenia (",bibo", " bibo") — usuwamy, by nie było dwóch.
 _OWN_TAIL = re.compile(r"\s*,?\s*bibo[\s.!]*$")
+# Znaczniki sterujące wtyczek: [[nazwa:wartosc]] — nigdy nie trafiają do usera.
+_MARKERS = re.compile(r"[ \t]*\[\[[a-z_]+:[a-z0-9_-]+\]\]")
 
 
 def _is_silence(text: str) -> bool:
@@ -36,7 +42,8 @@ def sign(response_text=None, platform=None, **_):
         return None
     if str(platform or "").lower() not in PLATFORMS or _is_silence(response_text):
         return None
-    text = _OWN_TAIL.sub("", response_text.rstrip()).rstrip()
+    text = _MARKERS.sub("", response_text).rstrip()
+    text = _OWN_TAIL.sub("", text).rstrip()
     return f"{text}{SEPARATOR}{SIGNATURE}" if text else None
 
 
