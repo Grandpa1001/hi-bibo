@@ -42,7 +42,7 @@ Możesz go uruchamiać ponownie (np. po `git pull`) — pamięć, historia,
 logowanie i tokeny zostają.
 
 **Aktualizacja** (bez gita, bez pytań): `hermes bibo update`. Pobiera
-najnowszą wersję z GitHuba, wgrywa `SOUL.md`, skrypty, wtyczki i front Mini
+najnowszą wersję z GitHuba (gdy masz aktualną — nic nie robi; `--force` wymusza), wgrywa `SOUL.md`, skrypty, wtyczki i front Mini
 App, a potem restartuje Bibo. Nie rusza `.env`, konfiguracji, pamięci ani
 zadań cron. Wersje: `hermes bibo version`. Jeśli komendy jeszcze nie ma
 (instalacja sprzed tej zmiany), pierwszy raz:

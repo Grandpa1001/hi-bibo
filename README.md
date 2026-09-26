@@ -33,7 +33,7 @@ cd hi-bibo
 
 Then message your bot.
 
-**Updating:** `hermes bibo update` fetches the latest version from GitHub (no git needed), installs
+**Updating:** `hermes bibo update` fetches the latest version from GitHub (no git needed; does nothing if you are up to date, `--force` reinstalls), installs
 `SOUL.md`, scripts, plugins and the Mini App, then restarts Bibo. It never touches `.env`, config,
 memory or cron jobs. `hermes bibo version` shows what's installed. On installs older than this command,
 run it once as `curl -fsSL https://raw.githubusercontent.com/Grandpa1001/hi-bibo/main/update.sh | bash`.

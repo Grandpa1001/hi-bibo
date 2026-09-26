@@ -176,11 +176,14 @@ uwagi do tonu → poprawki promptów → v1.0.
 ## 7. Instalacja i diagnostyka
 
 **Aktualizacja (od 26.09.2026):** `hermes bibo update` — wtyczka `bibo-cli` pobiera
-`update.sh` z GitHuba i uruchamia go. Skrypt podmienia `~/hi-bibo` na paczkę `main`
-(bez gita), uruchamia **swoją nową wersję** (`--install`) i wgrywa: `SOUL.md` (tylko gdy profil
+`update.sh` z GitHuba i uruchamia go. Skrypt pyta API GitHuba o SHA commita `main` — gdy równy
+`local/bibo_wersja`, kończy bez pobierania (`--force` wymusza). Inaczej pobiera paczkę tego commita
+do katalogu tymczasowego, uruchamia z niej **swoją nową wersję** (`--install <źródło>`) i wgrywa: `SOUL.md` (tylko gdy profil
 to Bibo), `scripts/`, wtyczki `bibo-podpis`, `bibo-cli` i — jeśli już zainstalowana —
 `bibo-tryby` z `miniapp/dist` jako `static/` (+ `cloudflared`, gdy brak), potem restart gatewaya.
-Nie rusza `.env`, `config.yaml`, pamięci, cronów. Zmienne do testów: `BIBO_GALAZ`, `BIBO_REPO`, `BIBO_PACZKA`.
+Kopię repo `~/hi-bibo` odświeża tylko, gdy ma do niej prawa (zamiana przez `.nowe`/`.stare`,
+bez połowicznego usuwania); w Dockerze `hermes bibo update` działa jako użytkownik `hermes`, więc
+root przy każdym zapisie oddaje pliki właścicielowi katalogu Hermesa. Nie rusza `.env`, `config.yaml`, pamięci, cronów. Zmienne do testów: `BIBO_GALAZ`, `BIBO_REPO`, `BIBO_PACZKA`.
 Pierwszy raz (bez `bibo-cli`): `curl -fsSL https://raw.githubusercontent.com/Grandpa1001/hi-bibo/main/update.sh | bash`.
 
 **Tryb demo do M3:** wtyczka serwuje front z `static/`; dopóki `API_GOTOWE = False` (api.py),
