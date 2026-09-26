@@ -139,6 +139,16 @@ Telegrama i sztucznym API; routing hash (`#/`, `#/sprawa`, `#/kontrola/<id>`, `#
 3 karty PNG do `sendPhoto`.
 **Odbiór:** przebieg w mocku na telefonie jak w prototypie; `dist/` ≤ 300 KB bez postaci.
 
+**Status: ✅ zrobione (26.09.2026).** `dist/`: kod + fonty 252 KB, postaci 188 KB, karty 576 KB.
+Przetestowane w mocku (375×812): start, zeznanie, analiza, przesłuchanie, podpowiedź, werdykt,
+przełącznik kontroli, zamknięcie, kontrola, kartoteka, ścieżka błędu z ponowieniem, wejście prosto
+na `#/sprawa`; build bez Telegrama pokazuje „Otwórz z czatu z Bibo”.
+- Praca nad frontem: `cd miniapp && npm install && npm run dev` (tryb mock włącza się sam; w buildzie: `?mock=1`).
+  Atrapa API: wymówka ze słowem „błąd” → błąd modelu; riposta < 12 znaków → werdykt „częściowo”.
+- Przed commitem: `npm run build` — `dist/` jest w repo.
+- Karty: `python3 miniapp/narzedzia/karty.py --roboto <Roboto.ttf> --mono <RobotoMono.ttf>` (fonty zmienne z google/fonts, poza repo).
+- Przyciski natywne deklaruje tylko ekran-liść (`usePrzyciski`) — efekt rodzica nadpisałby dziecko.
+
 ### M2 — Prompty i logika trybu (1–2 dni)
 `detektyw.py` (prompty §C.1–C.3), `llm.py` (walidacja, ponowienie, bank),
 `sucho.py` + `wymowki.yaml` (~15 przypadków: typowe wymówki, prawdziwe zmęczenie,
@@ -210,6 +220,10 @@ POST /api/sprawa/{id}/riposta {"riposta":"…"} | {"uniewinnienie":true}
 POST /api/sprawa/{id}/zamknij {"kontrola_min":10|null}
 → {"ok":true,"kontrola":"2026-09-24T22:02:00+02:00"|null}      (karta → komentarz Bibo; front: close())
 
+GET  /api/sprawa/{id}                                          (ekran kontroli)
+→ {"id":"s_7f3a","numer":7,"podejrzany":{"nazwa":"Perfekcjonista","emoji":"🎩"},
+   "krok":"…","werdykt":"obalona","kontrola":"2026-09-24T22:02:00+02:00"|null}
+
 POST /api/sprawa/{id}/kontrola {"ruszylo":true|false}          (false → prompt §C.6)
 → {"ok":true}
 
@@ -217,7 +231,9 @@ GET  /api/kartoteka → {"podejrzani":[…], "sprawy":[…]}
 GET  /health        → {"ok":true,"wersja":"0.1.0"}              (bez auth, bez adresu, bez danych)
 ```
 
-Sprawa bez `zamknij` przez 30 min → usuwana, nie trafia do kartoteki. Jedna aktywna sprawa naraz.
+Sprawa bez `zamknij` przez 30 min → usuwana, nie trafia do kartoteki. Jedna aktywna sprawa naraz —
+`POST /api/sprawa` porzuca poprzednią niezamkniętą (front po przeładowaniu otwiera nową, szkic wymówki wraca z `CloudStorage`).
+Błędy: front pokazuje `komunikat` z odpowiedzi; brak pola → własny tekst dla danego `blad`.
 
 ## 9. Dane (`$HERMES_HOME/local/bibo_tryby/`)
 

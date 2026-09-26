@@ -8,3 +8,6 @@ env.bibo-backup
 hermes-tutorial.pdf
 *.backup.*.json
 local/
+
+# Mini App
+miniapp/node_modules/
