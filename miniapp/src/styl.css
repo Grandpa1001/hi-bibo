@@ -169,3 +169,8 @@ blockquote { margin: 12px 0 0; padding: 8px 12px; border-left: 4px solid var(--t
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+/* pasek trybu demo (Telegram + ?mock=1) */
+.demo { position: sticky; top: 0; z-index: 3; background: var(--czern); color: var(--biel); text-align: center;
+  font: 700 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; padding: calc(7px + var(--gora)) 12px 7px; }
+.demo ~ .tresc { padding-top: 16px; }

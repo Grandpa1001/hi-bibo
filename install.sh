@@ -81,6 +81,14 @@ hermes plugins enable bibo-podpis --no-allow-tool-override >/dev/null 2>&1 \
   && echo "Wtyczka podpisu (bibo-podpis) ✓" \
   || echo "UWAGA: włącz wtyczkę ręcznie: hermes plugins enable bibo-podpis"
 
+# Komenda `hermes bibo update` — aktualizacja bez gita (update.sh z GitHuba).
+rm -rf "$HOME_DIR/plugins/bibo-cli"
+cp -r "$REPO/plugins/bibo-cli" "$HOME_DIR/plugins/bibo-cli"
+fix_owner "$HOME_DIR/plugins"
+hermes plugins enable bibo-cli --no-allow-tool-override >/dev/null 2>&1 \
+  && echo "Komenda aktualizacji (hermes bibo update) ✓" \
+  || echo "UWAGA: włącz wtyczkę ręcznie: hermes plugins enable bibo-cli"
+
 # Wbudowane skille Hermesa (~80) puchną w każdym zapytaniu. Usuwamy tylko
 # niezmienione; znacznik .no-bundled-skills blokuje ich powrót przy update.
 hermes skills opt-out --remove -y >/dev/null 2>&1 || true
@@ -226,6 +234,7 @@ say "Gotowe 🫧"
 cat <<TXT
   • Napisz do swojego bota na Telegramie — Bibo sam Cię pozna.
   • Stan:                 ./doctor.sh
+  • Aktualizacja:         hermes bibo update
   • Koszt promptu:        hermes prompt-size --platform telegram   (~13 KB)
   • Zużycie:              hermes insights
   • Panel konfiguracji:   hermes dashboard

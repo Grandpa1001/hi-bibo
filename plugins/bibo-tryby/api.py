@@ -1,4 +1,4 @@
-"""Trasy HTTP wtyczki. W M0: /health i strona diagnostyczna /spike."""
+"""Trasy HTTP wtyczki: front Mini App (static/), /health, diagnostyka /spike."""
 from __future__ import annotations
 
 import asyncio
@@ -13,18 +13,36 @@ from .telegram import BladTelegrama, EFEKT_KONFETTI, token
 
 log = logging.getLogger("bibo-tryby")
 ZASOBY = Path(__file__).parent / "zasoby"
-WERSJA = "0.0.1"
+STATIC = Path(__file__).parent / "static"      # miniapp/dist kopiowany przez install.sh / aktualizuj.sh
+WERSJA = "0.1.0"
+# Prawdziwe /api/* dla gry powstaje w M3. Do tego czasu przycisk menu otwiera front z ?mock=1
+# (tryb demo: natywne przyciski Telegrama, udawane odpowiedzi).
+API_GOTOWE = False
 
 
 def trasy(app: web.Application) -> None:
     app.router.add_get("/health", health)
-    app.router.add_get("/", spike_strona)
     app.router.add_get("/spike", spike_strona)
     app.router.add_post("/api/spike/kto", spike_kto)
     app.router.add_post("/api/spike/haiku", spike_haiku)
     app.router.add_post("/api/spike/karta", spike_karta)
     app.router.add_post("/api/spike/bibo", spike_bibo)
     app.router.add_post("/api/spike/propozycja", spike_propozycja)
+    app.router.add_get("/{sciezka:(?!api/).*}", front)
+
+
+async def front(request: web.Request) -> web.StreamResponse:
+    """Pliki frontu; nieznana ścieżka → index.html. Bez wyjścia poza katalog static/."""
+    if not (STATIC / "index.html").is_file():
+        return await spike_strona(request)
+    sciezka = request.match_info.get("sciezka", "")
+    plik = (STATIC / sciezka).resolve() if sciezka else STATIC / "index.html"
+    if not plik.is_file() or STATIC.resolve() not in plik.parents:
+        plik = STATIC / "index.html"
+    naglowki = {"Cache-Control": "no-cache"} if plik.name == "index.html" else \
+        {"Cache-Control": "public, max-age=31536000, immutable"} if "assets" in plik.parts else \
+        {"Cache-Control": "public, max-age=3600"}
+    return web.FileResponse(plik, headers=naglowki)
 
 
 def _blad(status: int, kod: str, komunikat: str) -> web.Response:
@@ -98,7 +116,7 @@ async def spike_propozycja(request: web.Request) -> web.Response:
     u = request.app["uslugi"]
     try:
         await u.bot.wiadomosc_z_aplikacja(uid, "🕵️ (test) Brzmi jak klasyczny zator. Otwieramy śledztwo?",
-                                          "🔍 Otwieramy", u.url or "")
+                                          "🔍 Otwieramy", (u.url or "") + ("" if API_GOTOWE else "/?mock=1"))
         return web.json_response({"ok": True})
     except BladTelegrama as e:
         return _blad(502, "telegram", str(e))

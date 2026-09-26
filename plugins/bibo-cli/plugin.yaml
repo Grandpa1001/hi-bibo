@@ -1,0 +1,4 @@
+name: bibo-cli
+version: "1.0.0"
+description: "Komendy Bibo w CLI Hermesa: `hermes bibo update` (najnowsza wersja z GitHuba) i `hermes bibo version`."
+provides_hooks: []

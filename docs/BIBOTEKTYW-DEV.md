@@ -175,6 +175,18 @@ uwagi do tonu → poprawki promptów → v1.0.
 
 ## 7. Instalacja i diagnostyka
 
+**Aktualizacja (od 26.09.2026):** `hermes bibo update` — wtyczka `bibo-cli` pobiera
+`update.sh` z GitHuba i uruchamia go. Skrypt podmienia `~/hi-bibo` na paczkę `main`
+(bez gita), uruchamia **swoją nową wersję** (`--install`) i wgrywa: `SOUL.md` (tylko gdy profil
+to Bibo), `scripts/`, wtyczki `bibo-podpis`, `bibo-cli` i — jeśli już zainstalowana —
+`bibo-tryby` z `miniapp/dist` jako `static/` (+ `cloudflared`, gdy brak), potem restart gatewaya.
+Nie rusza `.env`, `config.yaml`, pamięci, cronów. Zmienne do testów: `BIBO_GALAZ`, `BIBO_REPO`, `BIBO_PACZKA`.
+Pierwszy raz (bez `bibo-cli`): `curl -fsSL https://raw.githubusercontent.com/Grandpa1001/hi-bibo/main/update.sh | bash`.
+
+**Tryb demo do M3:** wtyczka serwuje front z `static/`; dopóki `API_GOTOWE = False` (api.py),
+przycisk menu otwiera `…/?mock=1` — prawdziwy Telegram (natywne przyciski, haptyka), udawane
+odpowiedzi, czarny pasek „Tryb demo”. Diagnostyka M0 zostaje pod `/spike`.
+
 **`install.sh` — sekcja „Tryby (Mini App)”:**
 
 ```

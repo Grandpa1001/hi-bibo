@@ -41,6 +41,13 @@ o token bota, Twoje ID i model, tworzy zadanie „pulsu” i restartuje gateway.
 Możesz go uruchamiać ponownie (np. po `git pull`) — pamięć, historia,
 logowanie i tokeny zostają.
 
+**Aktualizacja** (bez gita, bez pytań): `hermes bibo update`. Pobiera
+najnowszą wersję z GitHuba, wgrywa `SOUL.md`, skrypty, wtyczki i front Mini
+App, a potem restartuje Bibo. Nie rusza `.env`, konfiguracji, pamięci ani
+zadań cron. Wersje: `hermes bibo version`. Jeśli komendy jeszcze nie ma
+(instalacja sprzed tej zmiany), pierwszy raz:
+`curl -fsSL https://raw.githubusercontent.com/Grandpa1001/hi-bibo/main/update.sh | bash`.
+
 Wyłączenie Bibo (dane zostają): `./uninstall.sh`. Diagnostyka do wklejenia
 w zgłoszeniu (bez sekretów): `./doctor.sh`.
 

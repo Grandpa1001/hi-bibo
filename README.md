@@ -33,6 +33,11 @@ cd hi-bibo
 
 Then message your bot.
 
+**Updating:** `hermes bibo update` fetches the latest version from GitHub (no git needed), installs
+`SOUL.md`, scripts, plugins and the Mini App, then restarts Bibo. It never touches `.env`, config,
+memory or cron jobs. `hermes bibo version` shows what's installed. On installs older than this command,
+run it once as `curl -fsSL https://raw.githubusercontent.com/Grandpa1001/hi-bibo/main/update.sh | bash`.
+
 **Model billing:** an `ANTHROPIC_API_KEY` is the recommended path. Hermes' Claude subscription login (OAuth)
 only works on Claude **Max**, and it bills only purchased *extra usage*, never the plan's included allowance.
 It does not work on Pro at all.

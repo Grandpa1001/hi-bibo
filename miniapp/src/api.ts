@@ -1,5 +1,5 @@
 /** Klient API wtyczki bibo-tryby (kontrakt: docs/BIBOTEKTYW-DEV.md §8) + sztuczne API do trybu mock. */
-import { initData, mock } from "./tg";
+import { initData, sztuczneApi } from "./tg";
 
 export type Werdykt = "obalona" | "czesciowo" | "uniewinniona";
 export type Podejrzany = { nazwa: string; emoji: string; nowy: boolean; zatrzymanie: number; ostatnio: string | null };
@@ -172,4 +172,4 @@ function sztuczne(): Api {
   };
 }
 
-export const api: Api = mock ? sztuczne() : prawdziwe;
+export const api: Api = sztuczneApi ? sztuczne() : prawdziwe;

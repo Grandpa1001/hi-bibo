@@ -11,3 +11,4 @@ local/
 
 # Mini App
 miniapp/node_modules/
+plugins/bibo-tryby/static/

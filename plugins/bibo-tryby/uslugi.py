@@ -67,9 +67,11 @@ class Uslugi:
     async def _nowy_adres(self, url: str) -> None:
         self.url = url
         magazyn.zapisz("stan_tunelu.json", {"url": url, "od": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
+        from .api import API_GOTOWE
+        menu = url if API_GOTOWE else f"{url}/?mock=1"
         try:
-            await self.bot.ustaw_menu(url)
-            log.info("bibo-tryby: przycisk menu → %s", url)
+            await self.bot.ustaw_menu(menu)
+            log.info("bibo-tryby: przycisk menu → %s", menu)
         except BladTelegrama as e:
             log.warning("bibo-tryby: nie ustawiono przycisku menu: %s", e)
 

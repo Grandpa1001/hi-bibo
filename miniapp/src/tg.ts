@@ -15,8 +15,10 @@ const params = new URLSearchParams(location.search);
 
 /** Prawdziwy Telegram = jest podpisane initData. */
 export const wTelegramie = !!W?.initData;
-/** Tryb mock: dev serwer albo ?mock=1 — sztuczne API i przyciski w HTML. */
+/** Mock UI: poza Telegramem (dev serwer albo ?mock=1) — przyciski natywne rysowane w HTML. */
 export const mock = !wTelegramie && (import.meta.env.DEV || params.has("mock"));
+/** Sztuczne API: w mocku albo w Telegramie z ?mock=1 (demo, zanim wtyczka ma prawdziwe API). */
+export const sztuczneApi = mock || params.has("mock");
 
 export const initData = W?.initData ?? "";
 export const startParam = W?.initDataUnsafe?.start_param ?? "";

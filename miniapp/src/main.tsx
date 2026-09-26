@@ -7,7 +7,7 @@ import { Kontrola } from "./ekrany/Kontrola";
 import { Sprawa } from "./ekrany/Sprawa";
 import { Start } from "./ekrany/Start";
 import { trasa } from "./stan";
-import { mock, start, wTelegramie, zamknieta } from "./tg";
+import { mock, start, sztuczneApi, wTelegramie, zamknieta } from "./tg";
 import { Blad, NaglowekMock, PasekDolny, Postac, PopupMock } from "./ui/ui";
 
 start();
@@ -38,6 +38,7 @@ function App() {
   return (
     <>
       <NaglowekMock tytul={TYTULY[t.ekran]} />
+      {wTelegramie && sztuczneApi && <div class="demo">Tryb demo · odpowiedzi Bibo są udawane</div>}
       <main class="tresc">
         {t.ekran === "start" && <Start />}
         {t.ekran === "sprawa" && <Sprawa />}
