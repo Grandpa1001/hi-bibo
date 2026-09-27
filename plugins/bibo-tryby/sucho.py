@@ -18,10 +18,12 @@ ZESTAW = Path(__file__).parent / "tryby" / "wymowki_testowe.yaml"
 # Ostrzeżenia stylu (nie blokują gry — do oceny w raporcie).
 STYL = [
     (re.compile(r"prokrastyn|unikani|katastrofi", re.I), "etykietuje gracza"),
-    (re.compile(r"\b\w+(?:łeś|łaś|łbyś|łabyś)\b", re.I), "forma rodzajowa"),
+    (re.compile(r"\b\w+(?:łeś|łaś|łbyś|łabyś)\b|\bgdyby[śm]\s+\w+ł[ao]?\b", re.I), "forma rodzajowa"),
     (re.compile(r"\b(?:feature|feedback|bonus|deadline)\w*", re.I), "anglicyzm"),
-    (re.compile(r"zanim się rozmyśl|natychmiast|musisz", re.I), "presja"),
+    (re.compile(r"zanim się rozmyśl|natychmiast|(?<!nie )musisz", re.I), "presja"),
 ]
+# Limit czasu to presja tylko w kroku („wyślij w ciągu 3 minut”); w pytaniu zawęża zadanie.
+PRESJA_W_KROKU = re.compile(r"w ciągu \d+ ?(?:min|sek)|od razu", re.I)
 
 
 def _sprawdz(przypadek: dict, z: dict, w: dict) -> list[str]:
@@ -43,6 +45,9 @@ def _sprawdz(przypadek: dict, z: dict, w: dict) -> list[str]:
             m = wzor.search(tekst)
             if m:
                 uwagi.append(f"{opis} w polu {pole}: „{m.group(0)}”")
+    m = PRESJA_W_KROKU.search(w["krok"])
+    if m:
+        uwagi.append(f"presja w polu krok: „{m.group(0)}”")
     for pole, d in (("pytanie", z), ("krok", w)):
         if d["zrodlo"] == "bank":
             uwagi.append(f"{pole} z banku zapasowego (model zawiódł)")

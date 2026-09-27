@@ -76,6 +76,36 @@ class Przesluchanie(unittest.TestCase):
         self.assertNotIn("<system>", user)
 
 
+class Styl(unittest.TestCase):
+    MESKIE = {**ZEZNANIE_OK, "pytanie": "Ile artykułów przeczytałeś już o cenach?"}
+
+    def test_forma_rodzajowa_prosi_o_poprawke(self):
+        a = Atrapa(self.MESKIE, ZEZNANIE_OK)
+        z = detektyw.przesluchaj(WYMOWKA, wywolaj=a)
+        self.assertEqual((z["pytanie"], z["proby"]), (ZEZNANIE_OK["pytanie"], 2))
+        self.assertIn("przeczytałeś", a.wiadomosci[1][-1]["content"])
+
+    def test_forma_rodzajowa_przyjeta_przy_ostatniej_probie(self):
+        z = detektyw.przesluchaj(WYMOWKA, wywolaj=Atrapa(self.MESKIE, self.MESKIE))
+        self.assertEqual((z["zrodlo"], z["pytanie"]), ("model", self.MESKIE["pytanie"]))
+
+    def test_usterka_lepsza_niz_bank(self):
+        z = detektyw.przesluchaj(WYMOWKA, wywolaj=Atrapa(self.MESKIE, "zepsuty json"))
+        self.assertEqual((z["zrodlo"], z["pytanie"]), ("model", self.MESKIE["pytanie"]))
+
+    def test_wzorce_rodzaju(self):
+        for tekst in ("Ile przeczytałeś?", "Co by było, gdybyś zaczął teraz?", "mógłbyś", "zrobiłaś"):
+            self.assertTrue(detektyw.RODZAJ.search(tekst), tekst)
+        self.assertFalse(detektyw.RODZAJ.search("Ile masz już za sobą? Co się stanie, jeśli zaczniesz?"))
+
+    def test_presja_bez_falszywego_alarmu(self):
+        wzor = dict((o, w) for w, o in sucho.STYL)["presja"]
+        self.assertFalse(wzor.search("Nie musisz mieć wszystkich."))
+        self.assertTrue(wzor.search("Musisz to zrobić."))
+        self.assertFalse(wzor.search("Jaki krok zrobisz w ciągu 2 minut?"))
+        self.assertTrue(sucho.PRESJA_W_KROKU.search("Napisz zdanie i wyślij w ciągu 3 minut"))
+
+
 class Werdykt(unittest.TestCase):
     def test_poprawny_i_kropka_usunieta(self):
         w = detektyw.osadz(WYMOWKA, "Perfekcjonista", "Pytanie?", "Riposta", wywolaj=Atrapa(WERDYKT_OK))
@@ -86,6 +116,7 @@ class Werdykt(unittest.TestCase):
         w = detektyw.osadz(WYMOWKA, "Brak Paliwa", "Pytanie?", uniewinnienie=True, wywolaj=a)
         self.assertEqual(w["werdykt"], "czesciowo")
         self.assertIn("<tryb>uniewinnienie</tryb>", a.wiadomosci[0][1]["content"])
+        self.assertIn("przyznał wymówce rację", a.wiadomosci[0][1]["content"])
 
     def test_zly_werdykt_bank(self):
         w = detektyw.osadz(WYMOWKA, "X", "P?", "r", wywolaj=Atrapa({**WERDYKT_OK, "werdykt": "winna"}, "zle"))

@@ -525,7 +525,16 @@ z krokiem-odpoczynkiem; przy `<tryb>uniewinnienie</tryb>` nigdy `obalona` (też 
   z powrotem do raportu, strach przed odrzuceniem bez własnego podejrzanego.
 - v2 (27.09) — zasady powyżej, przykłady w promptach, nowy podejrzany Czarnowidz 🌧️,
   niższe temperatury, walidacja jednego „?”; `dry-run` ostrzega o etykietach, formach
-  rodzajowych, anglicyzmach i presji. Czeka na drugi raport.
+  rodzajowych, anglicyzmach i presji.
+- v2 raport (27.09): JSON 93%, 0 z banku, etykiety zniknęły, zmęczenie → `uniewinniona`,
+  Czarnowidz trafiony 2/2. Zostało: formy męskie (3 ×, reguła nie łapała „gdybyś zaczął”),
+  „riposta jest pusta” przy uniewinnieniu, pytanie przy zmęczeniu ciągnące do zadania,
+  presja czasu w kroku („w ciągu 3 minut”), zgadywanie stanu gracza, literówki Haiku.
+- v3 (27.09) — formy rodzajowe jako **miękka walidacja** (`BladStylu`: jedna prośba o
+  poprawkę; przy ostatniej próbie odpowiedź przyjęta mimo usterki; usterka lepsza niż bank),
+  przy uniewinnieniu `<riposta>` mówi wprost „gracz sam przyznał wymówce rację”, przy
+  wyczerpaniu pytanie o stan gracza, krok bez presji czasu, bez zgadywania stanu.
+  Czeka na trzeci raport; jeśli literówki zostaną — Sonnet w `auxiliary.bibo_tryby`.
 
 ### C.3 Bank zapasowy (bez modelu)
 

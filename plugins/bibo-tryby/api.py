@@ -14,7 +14,7 @@ from .telegram import BladTelegrama, EFEKT_KONFETTI, token
 log = logging.getLogger("bibo-tryby")
 ZASOBY = Path(__file__).parent / "zasoby"
 STATIC = Path(__file__).parent / "static"      # miniapp/dist kopiowany przez install.sh / aktualizuj.sh
-WERSJA = "0.2.1"
+WERSJA = "0.2.2"
 # Prawdziwe /api/* dla gry powstaje w M3. Do tego czasu przycisk menu otwiera front z ?mock=1
 # (tryb demo: natywne przyciski Telegrama, udawane odpowiedzi).
 API_GOTOWE = False

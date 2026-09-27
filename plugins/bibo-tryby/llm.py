@@ -20,6 +20,15 @@ class BladWalidacji(ValueError):
     pass
 
 
+class BladStylu(BladWalidacji):
+    """Odpowiedź poprawna, ale z usterką stylu: prosimy o poprawkę, a przy ostatniej
+    próbie przyjmujemy ją mimo to (styl nie może spychać gry do banku zapasowego)."""
+
+    def __init__(self, komunikat: str, dane: dict):
+        super().__init__(komunikat)
+        self.dane = dane
+
+
 def wywolaj_haiku(messages: list[dict], temperature: float, max_tokens: int) -> str:
     """Domyślne wywołanie: zadanie auxiliary `bibo_tryby` (logowanie Hermesa, model z konfiguracji)."""
     from agent.auxiliary_client import call_llm
@@ -54,14 +63,24 @@ def zapytaj(system: str, user: str, waliduj: Walidator, *, temperature: float,
             max_tokens: int = 300, wywolaj: Wywolanie | None = None, proby: int = 2) -> tuple[dict | None, int]:
     wywolaj = wywolaj or wywolaj_haiku
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    z_usterka: dict | None = None   # poprawna treść z usterką stylu — lepsza niż bank
     for nr in range(1, proby + 1):
         try:
             tekst = wywolaj(messages, temperature, max_tokens)
         except Exception as e:
             log.warning("bibo-tryby: model niedostępny (%s: %s)", type(e).__name__, e)
-            return None, nr
+            return z_usterka, nr
         try:
             return waliduj(wyciagnij_json(tekst)), nr
+        except BladStylu as e:
+            z_usterka = e.dane
+            if nr == proby:
+                return e.dane, nr
+            log.info("bibo-tryby: próba %s — usterka stylu: %s", nr, e)
+            messages = messages + [
+                {"role": "assistant", "content": tekst[:2000]},
+                {"role": "user", "content": f"Popraw tylko to: {e}. Odpowiedz ponownie samym obiektem JSON."},
+            ]
         except BladWalidacji as e:
             log.info("bibo-tryby: próba %s odrzucona: %s", nr, e)
             messages = messages + [
@@ -69,4 +88,4 @@ def zapytaj(system: str, user: str, waliduj: Walidator, *, temperature: float,
                 {"role": "user", "content": f"Ta odpowiedź jest niepoprawna: {e}. "
                                             "Odpowiedz jeszcze raz, wyłącznie poprawnym obiektem JSON wg schematu."},
             ]
-    return None, proby
+    return z_usterka, proby
