@@ -5,6 +5,7 @@ Wynik: raport Markdown do oceny tonu + podsumowanie liczbowe.
 """
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
@@ -14,18 +15,34 @@ from .tryby import detektyw
 
 ZESTAW = Path(__file__).parent / "tryby" / "wymowki_testowe.yaml"
 
+# Ostrzeżenia stylu (nie blokują gry — do oceny w raporcie).
+STYL = [
+    (re.compile(r"prokrastyn|unikani|katastrofi", re.I), "etykietuje gracza"),
+    (re.compile(r"\b\w+(?:łeś|łaś|łbyś|łabyś)\b", re.I), "forma rodzajowa"),
+    (re.compile(r"\b(?:feature|feedback|bonus|deadline)\w*", re.I), "anglicyzm"),
+    (re.compile(r"zanim się rozmyśl|natychmiast|musisz", re.I), "presja"),
+]
+
 
 def _sprawdz(przypadek: dict, z: dict, w: dict) -> list[str]:
     o = przypadek.get("oczekiwania") or {}
     uwagi = []
     if o.get("podejrzany") and z["podejrzany"] != o["podejrzany"]:
         uwagi.append(f"podejrzany {z['podejrzany']} ≠ oczekiwany {o['podejrzany']}")
+    if o.get("werdykt") and w["werdykt"] != o["werdykt"]:
+        uwagi.append(f"werdykt „{w['werdykt']}” ≠ oczekiwany „{o['werdykt']}”")
     if w["werdykt"] in (o.get("nie") or []):
         uwagi.append(f"werdykt „{w['werdykt']}” niedozwolony w tym przypadku")
     calosc = " ".join(str(v) for v in (*z.values(), *w.values())).lower()
     for zakazane in o.get("zakazane") or []:
         if zakazane.lower() in calosc:
             uwagi.append(f"w odpowiedzi jest zakazane „{zakazane}”")
+    teksty = {"pytanie": z["pytanie"], "podpowiedź": z["podpowiedz"], "podsumowanie": w["podsumowanie"], "krok": w["krok"]}
+    for pole, tekst in teksty.items():
+        for wzor, opis in STYL:
+            m = wzor.search(tekst)
+            if m:
+                uwagi.append(f"{opis} w polu {pole}: „{m.group(0)}”")
     for pole, d in (("pytanie", z), ("krok", w)):
         if d["zrodlo"] == "bank":
             uwagi.append(f"{pole} z banku zapasowego (model zawiódł)")

@@ -1,6 +1,7 @@
 # Zestaw do testu na sucho (`hermes bibo dry-run`): prawdziwe Haiku, raport do oceny tonu.
 # oczekiwania:
 #   podejrzany  — oczekiwana nazwa (sprawdzamy tylko, gdy podana)
+#   werdykt     — oczekiwany werdykt (gdy tylko jeden jest dobry)
 #   nie         — werdykty, które byłyby błędem
 #   zakazane    — fragmenty, które nie mogą pojawić się w odpowiedziach (np. efekt prompt injection)
 
@@ -27,7 +28,7 @@
 - nazwa: Prawdziwe zmęczenie
   wymowka: "Spałem 4 godziny, cały dzień byłem w pracy i serio nie mam siły na ten raport."
   riposta: "No nie, naprawdę ledwo patrzę na oczy, jutro rano będzie lepiej."
-  oczekiwania: {nie: [obalona]}
+  oczekiwania: {podejrzany: Brak Paliwa, werdykt: uniewinniona}
 
 - nazwa: Gracz sam uniewinnia
   wymowka: "Boli mnie głowa od rana i ekran mnie męczy."
@@ -52,12 +53,12 @@
 - nazwa: Żart zamiast riposty
   wymowka: "Kot mi usiadł na klawiaturze, więc nie mogę pracować."
   riposta: "hehe no kot jest szefem"
-  oczekiwania: {nie: [obalona]}
+  oczekiwania: {nie: [obalona], zakazane: [przeniósł]}
 
 - nazwa: Pusta riposta
   wymowka: "Nie chce mi się dzwonić do urzędu, bo pewnie i tak nikt nie odbierze."
   riposta: "..."
-  oczekiwania: {nie: [obalona]}
+  oczekiwania: {podejrzany: Czarnowidz, nie: [obalona]}
 
 - nazwa: Po angielsku
   wymowka: "I'll do my taxes next week, I need to find all the receipts first."
@@ -76,4 +77,4 @@
 - nazwa: Strach przed oceną
   wymowka: "Nie wyślę tego maila do rekrutera, bo pewnie i tak mnie odrzucą."
   riposta: "Jak nie wyślę, to odrzucenie mam gwarantowane."
-  oczekiwania: {nie: [uniewinniona]}
+  oczekiwania: {podejrzany: Czarnowidz, nie: [uniewinniona]}
