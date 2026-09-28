@@ -53,6 +53,45 @@ run hermes prompt-size --platform telegram
 sec "Cron"
 run hermes cron list --all
 
+sec "Tryby (Mini App)"
+if hermes plugins list 2>/dev/null | grep -qE '^bibo-tryby([[:space:]]|$)'; then
+  echo "wtyczka: enabled"
+else
+  echo "wtyczka: wyłączona / brak"
+fi
+if [[ -x "$HERMES_ROOT/bin/cloudflared" ]]; then
+  echo "cloudflared: $HERMES_ROOT/bin/cloudflared ✓"
+elif command -v cloudflared >/dev/null 2>&1; then
+  echo "cloudflared: $(command -v cloudflared) ✓"
+else
+  echo "cloudflared: brak"
+fi
+if [[ -f "$HERMES_ROOT/plugins/bibo-tryby/static/index.html" ]]; then
+  echo "front (static/index.html): ✓"
+else
+  echo "front: brak (front Mini App nie został skopiowany — uruchom hermes bibo update)"
+fi
+port="$(python3 -c "import json;print(json.load(open('$HERMES_ROOT/local/bibo_tryby/ustawienia.json')).get('port',8787))" 2>/dev/null || echo 8787)"
+if code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/health" 2>/dev/null)"; then
+  echo "/health (127.0.0.1:$port): $code"
+else
+  echo "/health (127.0.0.1:$port): brak odpowiedzi"
+fi
+tun="$(python3 -c "import json;print(json.load(open('$HERMES_ROOT/local/bibo_tryby/stan_tunelu.json'))['url'])" 2>/dev/null || true)"
+if [[ -n "$tun" ]]; then
+  echo "tunel: $tun"
+  if code="$(curl -s -o /dev/null -w '%{http_code}' "$tun/health" 2>/dev/null)"; then
+    echo "/health przez tunel: $code"
+  fi
+else
+  echo "tunel: brak zapisu (stan_tunelu.json)"
+fi
+if pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
+  echo "proces cloudflared: żyje"
+else
+  echo "proces cloudflared: nie widać"
+fi
+
 sec "Ostatnie logi gatewaya"
 run hermes logs gateway -n 40
 run hermes logs errors -n 20

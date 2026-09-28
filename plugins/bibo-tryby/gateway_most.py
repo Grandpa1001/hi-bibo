@@ -25,7 +25,14 @@ def zapamietaj_zrodlo(source) -> None:
     uid = str(getattr(source, "user_id", "") or getattr(source, "chat_id", "") or "")
     if uid and getattr(source, "chat_type", "dm") == "dm":
         with _blokada:
+            _zrodla.pop(uid, None)     # przenieś na koniec dict — ostatnia rozmowa
             _zrodla[uid] = source
+
+
+def ostatni_user() -> str | None:
+    """Najświeższy user Telegramowy (dla propozycji z post_llm_call)."""
+    with _blokada:
+        return next(reversed(_zrodla), None) if _zrodla else None
 
 
 def _runner():

@@ -74,6 +74,27 @@ hermes dashboard
 Na serwerze: `ssh -L 9119:127.0.0.1:9119 twój-serwer`, tam `hermes dashboard --no-open`,
 a u siebie otwórz http://127.0.0.1:9119.
 
+## Tryby / Mini App (Bibotektyw)
+
+Opcjonalna wtyczka `bibo-tryby` dokłada do czatu przycisk „🎲 Tryby” obok
+pola wiadomości. Otwiera Mini App z grą **Bibotektyw**: bierzesz wymówkę,
+z której odkładasz zadanie, Bibo-detektyw przesłuchuje ją jak podejrzanego
+i wydaje werdykt („obalona” / „częściowo” / „uniewinniona”) plus jeden mały
+krok. Po zamknięciu akt Bibo pisze do Ciebie w czacie i po 10 min sprawdza,
+czy ruszyło.
+
+- **Dystrybucja:** własna instancja u Ciebie (własny bot → własny Hermes → wtyczka)
+- **HTTPS:** darmowy tunel Cloudflare (`cloudflared`), bez konta i domeny —
+  adres zmienia się po restarcie, wtyczka sama przestawia przycisk menu
+- **Model:** 2 × `claude-haiku-4-5` na sprawę (~$0,002) + 1 × Sonnet na
+  komentarz Bibo — korzysta z Twojego logowania Hermesa
+- **Dane:** kartoteka w `~/.hermes/local/bibo_tryby/` (przeżywa aktualizacje);
+  wymówki idą do Anthropic w ramach zapytania, nie są zapisywane po stronie zewnętrznej
+- **Wyłączenie:** `hermes plugins disable bibo-tryby` → Bibo działa jak przedtem
+
+Włączasz w `./install.sh` (odpowiedź „T” w sekcji Tryby); ponownie:
+`hermes bibo update`. Diagnostyka trybów jest w `./doctor.sh`.
+
 ## Proaktywne wiadomości
 
 Zadanie `bibo-pulse` budzi się co godzinę, ale model odpala tylko wtedy,

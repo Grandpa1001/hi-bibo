@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from . import gateway_most, uslugi
+from . import czat, gateway_most, uslugi
 
 log = logging.getLogger("bibo-tryby")
 ZNACZNIK = "[[tryb:detektyw]]"
@@ -44,8 +44,14 @@ def _przed_tura(platform: str = "", **_):
 
 def _po_turze(assistant_response: str = "", platform: str = "", **_):
     try:
-        if platform == "telegram" and ZNACZNIK in (assistant_response or ""):
-            log.info("bibo-tryby: wykryto znacznik propozycji")   # M0.6; wysyłka propozycji w M4
+        if platform != "telegram" or ZNACZNIK not in (assistant_response or ""):
+            return
+        u = uslugi.aktywne()
+        uid = gateway_most.ostatni_user()
+        if u and uid:
+            u.zleć(czat.wyslij_propozycje(uid, u))
+        else:
+            log.info("bibo-tryby: znacznik propozycji wykryty, ale usługi/user niedostępne")
     except Exception:
         log.debug("bibo-tryby: post_llm_call", exc_info=True)
 

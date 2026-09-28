@@ -13,7 +13,7 @@ import time
 import aiohttp
 from aiohttp import web
 
-from . import magazyn, wystawienie
+from . import kontrola, magazyn, wystawienie
 from .telegram import BotApi, BladTelegrama
 
 log = logging.getLogger("bibo-tryby")
@@ -61,6 +61,7 @@ class Uslugi:
             return
         log.info("bibo-tryby: API na 127.0.0.1:%s", self.port)
         self.wystawienie = wystawienie.utworz(self.ust)
+        self._kontrola = asyncio.create_task(kontrola.petla(self))
         await self.wystawienie.uruchom(self._nowy_adres)   # QuickTunnel: działa do końca procesu
         await asyncio.Event().wait()
 

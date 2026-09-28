@@ -13,14 +13,14 @@ from pathlib import Path
 
 from aiohttp import web
 
-from . import auth, gateway_most, magazyn
+from . import auth, czat, gateway_most, magazyn
 from .telegram import BladTelegrama, EFEKT_KONFETTI, token
 from .tryby import detektyw
 
 log = logging.getLogger("bibo-tryby")
 ZASOBY = Path(__file__).parent / "zasoby"
 STATIC = Path(__file__).parent / "static"      # miniapp/dist kopiowany przez install.sh / aktualizuj.sh
-WERSJA = "0.3.0"
+WERSJA = "0.4.0"
 API_GOTOWE = True
 
 WERDYKT_ETYKIETY = {"obalona": "💥 WYMÓWKA OBALONA",
@@ -354,9 +354,14 @@ async def api_zamknij(request: web.Request) -> web.Response:
     sprawa.update({"etap": "zamknieta", "kontrola": kontrola_iso, "kontrola_wyslana": False,
                    "ostatnia_akcja": magazyn.iso()})
     stan[sid] = sprawa
-    kart["notatka_dla_bibo"] = _tekst_notatki(sprawa["numer"], sprawa, kart)
+    notatka = _tekst_notatki(sprawa["numer"], sprawa, kart)
+    kart["notatka_dla_bibo"] = notatka
     magazyn.zapisz_kartoteke(kart)
     magazyn.zapisz_sprawy(stan)
+
+    u = request.app.get("uslugi")
+    if u is not None and getattr(u, "bot", None):
+        asyncio.create_task(czat.zakoncz_sprawe(uid, {"id": sid, **sprawa}, notatka, u))
 
     return web.json_response({"ok": True, "kontrola": kontrola_iso})
 
@@ -384,6 +389,11 @@ async def api_kontrola(request: web.Request) -> web.Response:
     # po odbytej kontroli sprawa może wypaść ze `sprawy.json`
     del stan[sid]
     magazyn.zapisz_sprawy(stan)
+
+    if not ruszylo:
+        u = request.app.get("uslugi")
+        if u is not None:
+            asyncio.create_task(czat.zapytaj_co_blokuje(uid, sprawa))
     return web.json_response({"ok": True})
 
 

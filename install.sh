@@ -220,7 +220,44 @@ else
     && echo "Dzienny licznik zużycia (bibo-usage, 23:55, 0 tokenów) ✓"
 fi
 
-# --- 8. Gateway -----------------------------------------------------------------
+# --- 8. Tryby (Mini App) -----------------------------------------------------
+say "Tryby Bibo (Mini App z grą Bibotektyw)"
+echo "Działa przez darmowy tunel Cloudflare — bez domeny i bez konta."
+if yes "Włączyć Tryby?"; then
+  # cloudflared do katalogu Hermesa (wolumen — przeżywa update kontenera)
+  if ! command -v cloudflared >/dev/null 2>&1 && [[ ! -x "$HOME_DIR/bin/cloudflared" ]]; then
+    A="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+    mkdir -p "$HOME_DIR/bin"
+    if curl -fsSL -o "$HOME_DIR/bin/cloudflared" \
+        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$A"; then
+      chmod +x "$HOME_DIR/bin/cloudflared"; fix_owner "$HOME_DIR/bin"
+      echo "cloudflared ($A) ✓"
+    else
+      rm -f "$HOME_DIR/bin/cloudflared"
+      echo "UWAGA: nie udało się pobrać cloudflared — dograj ręcznie do $HOME_DIR/bin/"
+    fi
+  else
+    echo "cloudflared: jest ✓"
+  fi
+  rm -rf "$HOME_DIR/plugins/bibo-tryby"
+  cp -r "$REPO/plugins/bibo-tryby" "$HOME_DIR/plugins/bibo-tryby"
+  if [[ -d "$REPO/miniapp/dist" ]]; then
+    cp -r "$REPO/miniapp/dist" "$HOME_DIR/plugins/bibo-tryby/static"
+  fi
+  mkdir -p "$HOME_DIR/local/bibo_tryby"
+  fix_owner "$HOME_DIR/plugins" "$HOME_DIR/local"
+  hermes plugins enable bibo-tryby --no-allow-tool-override >/dev/null 2>&1 \
+    && echo "Wtyczka bibo-tryby ✓" \
+    || echo "UWAGA: włącz ręcznie: hermes plugins enable bibo-tryby"
+  echo "Po restarcie Bibo w Telegramie pojawi się przycisk „🎲 Tryby” obok pola wiadomości."
+else
+  if hermes plugins list 2>/dev/null | grep -q '^bibo-tryby'; then
+    hermes plugins disable bibo-tryby >/dev/null 2>&1 || true
+    echo "Tryby wyłączone. Dane (kartoteka) zostają w $HOME_DIR/local/bibo_tryby/."
+  fi
+fi
+
+# --- 9. Gateway -----------------------------------------------------------------
 say "Uruchamiam Bibo"
 if hermes gateway restart; then
   echo "Gateway zrestartowany ✓"
