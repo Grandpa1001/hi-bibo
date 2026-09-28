@@ -47,9 +47,9 @@ class Uslugi:
     async def _main(self) -> None:
         self.http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
         self.bot = BotApi(self.http)
-        app = web.Application(client_max_size=4096, middlewares=[_naglowki])
-        app["uslugi"] = self
         from . import api
+        app = web.Application(client_max_size=4096, middlewares=[api.bledy, _naglowki])
+        app["uslugi"] = self
         api.trasy(app)
         runner = web.AppRunner(app, access_log=None)
         await runner.setup()
