@@ -78,6 +78,7 @@ wgraj_wtyczke() {  # nazwa [tak = zainstaluj także, gdy jej jeszcze nie ma]
 }
 wgraj_wtyczke bibo-podpis tak
 wgraj_wtyczke bibo-cli tak
+wgraj_wtyczke bibo-zegar tak
 wgraj_wtyczke bibo-tryby          # tylko jeśli tryby są już zainstalowane
 
 if [[ -d "$H/plugins/bibo-tryby" && ! -x "$H/bin/cloudflared" ]] && ! command -v cloudflared >/dev/null; then

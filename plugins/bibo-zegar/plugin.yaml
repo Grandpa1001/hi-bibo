@@ -1,0 +1,5 @@
+name: bibo-zegar
+version: "0.1.0"
+description: "Kontekst czasu: przed każdą turą Bibo dostaje aktualny dzień, datę i godzinę w polskiej strefie. Zapobiega „wczoraj” zamiast „dziś” i „zaraz” zamiast „za godzinę”."
+provides_hooks:
+  - pre_llm_call

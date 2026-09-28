@@ -23,7 +23,7 @@ rm -f "$HOME_DIR/scripts/bibo_pulse.py"
 
 hermes cron remove bibo-usage 2>/dev/null || true
 rm -f "$HOME_DIR/scripts/bibo_raport.py" "$HOME_DIR/scripts/bibo_usage_snapshot.py"
-for w in bibo-podpis bibo-cli bibo-tryby; do
+for w in bibo-podpis bibo-cli bibo-zegar bibo-tryby; do
   hermes plugins disable "$w" >/dev/null 2>&1 || true
   rm -rf "$HOME_DIR/plugins/$w"
 done

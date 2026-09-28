@@ -81,6 +81,14 @@ hermes plugins enable bibo-podpis --no-allow-tool-override >/dev/null 2>&1 \
   && echo "Wtyczka podpisu (bibo-podpis) ✓" \
   || echo "UWAGA: włącz wtyczkę ręcznie: hermes plugins enable bibo-podpis"
 
+# Kontekst czasu (data, godzina, dzień tygodnia) doklejany do każdej tury.
+rm -rf "$HOME_DIR/plugins/bibo-zegar"
+cp -r "$REPO/plugins/bibo-zegar" "$HOME_DIR/plugins/bibo-zegar"
+fix_owner "$HOME_DIR/plugins"
+hermes plugins enable bibo-zegar --no-allow-tool-override >/dev/null 2>&1 \
+  && echo "Kontekst czasu (bibo-zegar) ✓" \
+  || echo "UWAGA: włącz wtyczkę ręcznie: hermes plugins enable bibo-zegar"
+
 # Komenda `hermes bibo update` — aktualizacja bez gita (update.sh z GitHuba).
 rm -rf "$HOME_DIR/plugins/bibo-cli"
 cp -r "$REPO/plugins/bibo-cli" "$HOME_DIR/plugins/bibo-cli"
