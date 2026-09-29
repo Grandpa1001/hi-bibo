@@ -243,6 +243,16 @@ class KodyBledow(BazaApi):
         j = await r.json()
         self.assertEqual((r.status, j["blad"]), (429, "limit"))
 
+    async def test_503_awaria_modelu_bez_zapisu_i_bez_werdyktu(self):
+        self.odpowiedzi = ["nie json", "{}"]
+        sid = (await (await self.POST("/api/sprawa")).json())["id"]
+        r = await self.POST(f"/api/sprawa/{sid}/zeznanie", {"wymowka": "Zrobię to jutro."})
+        j = await r.json()
+        self.assertEqual((r.status, j["blad"]), (503, "model"))
+        self.assertNotIn("werdykt", j)
+        self.assertEqual(magazyn.kartoteka()["podejrzani"]["Jutrzejszy Ja"]["zatrzymania"], 0)
+        self.assertEqual(magazyn.sprawy()[sid]["etap"], "nowa")   # można ponowić
+
     async def test_health_bez_auth(self):
         r = await self.client.get("/health")
         j = await r.json()

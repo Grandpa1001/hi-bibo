@@ -11,6 +11,7 @@ from pathlib import Path
 
 import yaml
 
+from .llm import BladModelu
 from .tryby import detektyw
 
 ZESTAW = Path(__file__).parent / "tryby" / "wymowki_testowe.yaml"
@@ -48,27 +49,32 @@ def _sprawdz(przypadek: dict, z: dict, w: dict) -> list[str]:
     m = PRESJA_W_KROKU.search(w["krok"])
     if m:
         uwagi.append(f"presja w polu krok: „{m.group(0)}”")
-    for pole, d in (("pytanie", z), ("krok", w)):
-        if d["zrodlo"] == "bank":
-            uwagi.append(f"{pole} z banku zapasowego (model zawiódł)")
     return uwagi
 
 
 def uruchom(zestaw: Path = ZESTAW, raport: Path | None = None, wywolaj=None, wypisz=print) -> dict:
     przypadki = yaml.safe_load(zestaw.read_text(encoding="utf-8"))
     linie = [f"# Bibotektyw — test na sucho ({time.strftime('%Y-%m-%d %H:%M')})", ""]
-    staty = {"przypadki": 0, "json_za_1": 0, "wywolania": 0, "z_banku": 0, "problemy": 0, "czas_s": 0.0}
+    staty = {"przypadki": 0, "json_za_1": 0, "wywolania": 0, "bledy_modelu": 0, "problemy": 0, "czas_s": 0.0}
     for i, p in enumerate(przypadki, 1):
         t0 = time.time()
-        z = detektyw.przesluchaj(p["wymowka"], wywolaj=wywolaj)
-        w = detektyw.osadz(p["wymowka"], z["podejrzany"], z["pytanie"], p.get("riposta"),
-                           uniewinnienie=bool(p.get("uniewinnienie")), wywolaj=wywolaj)
+        try:
+            z = detektyw.przesluchaj(p["wymowka"], wywolaj=wywolaj)
+            w = detektyw.osadz(p["wymowka"], z["podejrzany"], z["pytanie"], p.get("riposta"),
+                               uniewinnienie=bool(p.get("uniewinnienie")), wywolaj=wywolaj)
+        except BladModelu:
+            staty["przypadki"] += 1
+            staty["bledy_modelu"] += 1
+            staty["problemy"] += 1
+            wypisz(f"[{i}/{len(przypadki)}] {p['nazwa']}: ⚠ model zawiódł (błąd, bez zastępczej treści)")
+            linie += [f"## {i}. {p['nazwa']}  ⚠", "", f"**Wymówka:** {p['wymowka']}", "",
+                      "**Uwagi:** model zawiódł — użytkownik zobaczyłby błąd z ponowieniem", ""]
+            continue
         dt = time.time() - t0
         uwagi = _sprawdz(p, z, w)
         staty["przypadki"] += 1
         staty["json_za_1"] += (z["proby"] == 1 and z["zrodlo"] == "model") + (w["proby"] == 1 and w["zrodlo"] == "model")
         staty["wywolania"] += z["proby"] + w["proby"]
-        staty["z_banku"] += (z["zrodlo"] == "bank") + (w["zrodlo"] == "bank")
         staty["problemy"] += bool(uwagi)
         staty["czas_s"] += dt
         wypisz(f"[{i}/{len(przypadki)}] {p['nazwa']}: {z['emoji']} {z['podejrzany']} → {w['werdykt']}"
@@ -89,7 +95,7 @@ def uruchom(zestaw: Path = ZESTAW, raport: Path | None = None, wywolaj=None, wyp
         linie += [f"_{dt:.1f} s_", ""]
     n = max(1, staty["przypadki"] * 2)
     podsumowanie = (f"Przypadków: {staty['przypadki']} · JSON poprawny za 1. razem: {100 * staty['json_za_1'] / n:.0f}% · "
-                    f"wywołań modelu: {staty['wywolania']} · z banku: {staty['z_banku']} · "
+                    f"wywołań modelu: {staty['wywolania']} · błędów modelu: {staty['bledy_modelu']} · "
                     f"z uwagami: {staty['problemy']} · czas: {staty['czas_s']:.0f} s")
     linie[1:1] = ["", f"**{podsumowanie}**", ""]
     if raport:

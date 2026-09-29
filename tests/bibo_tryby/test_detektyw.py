@@ -9,6 +9,7 @@ from _ladowanie import podmodul  # noqa: E402
 
 detektyw = podmodul("bibo-tryby", "tryby.detektyw")
 sucho = podmodul("bibo-tryby", "sucho")
+BladModelu = podmodul("bibo-tryby", "llm").BladModelu
 
 WYMOWKA = "Muszę najpierw zrobić idealny research front-endu i GSAP, inaczej nie ruszam kodu."
 
@@ -55,18 +56,17 @@ class Przesluchanie(unittest.TestCase):
         self.assertEqual((z["zrodlo"], z["proby"]), ("model", 2))
         self.assertIn("znakiem zapytania", a.wiadomosci[1][-1]["content"])
 
-    def test_bank_gdy_model_dwa_razy_zawodzi(self):
-        z = detektyw.przesluchaj("Zrobię to jutro.", wywolaj=Atrapa("nie json", "{}"))
-        self.assertEqual((z["zrodlo"], z["podejrzany"], z["emoji"]), ("bank", "Jutrzejszy Ja", "📅"))
-        self.assertTrue(z["pytanie"].endswith("?") or z["pytanie"].endswith("."))
+    def test_blad_gdy_model_dwa_razy_zawodzi(self):
+        with self.assertRaises(BladModelu):
+            detektyw.przesluchaj("Zrobię to jutro.", wywolaj=Atrapa("nie json", "{}"))
 
-    def test_bank_gdy_model_niedostepny(self):
-        z = detektyw.przesluchaj("coś zupełnie innego", wywolaj=Atrapa(RuntimeError("401")))
-        self.assertEqual((z["zrodlo"], z["podejrzany"]), ("bank", "Mgła Startowa"))
+    def test_blad_gdy_model_niedostepny(self):
+        with self.assertRaises(BladModelu):
+            detektyw.przesluchaj("coś zupełnie innego", wywolaj=Atrapa(RuntimeError("401")))
 
     def test_za_dlugie_pytanie_odrzucone(self):
-        z = detektyw.przesluchaj(WYMOWKA, wywolaj=Atrapa({**ZEZNANIE_OK, "pytanie": "x" * 200 + "?"}, "zle"))
-        self.assertEqual(z["zrodlo"], "bank")
+        with self.assertRaises(BladModelu):
+            detektyw.przesluchaj(WYMOWKA, wywolaj=Atrapa({**ZEZNANIE_OK, "pytanie": "x" * 200 + "?"}, "zle"))
 
     def test_nie_da_sie_zamknac_tagu(self):
         a = Atrapa(ZEZNANIE_OK)
@@ -118,13 +118,17 @@ class Werdykt(unittest.TestCase):
         self.assertIn("<tryb>uniewinnienie</tryb>", a.wiadomosci[0][1]["content"])
         self.assertIn("przyznał wymówce rację", a.wiadomosci[0][1]["content"])
 
-    def test_zly_werdykt_bank(self):
-        w = detektyw.osadz(WYMOWKA, "X", "P?", "r", wywolaj=Atrapa({**WERDYKT_OK, "werdykt": "winna"}, "zle"))
-        self.assertEqual((w["werdykt"], w["zrodlo"]), ("czesciowo", "bank"))
+    def test_zly_werdykt_to_blad_a_nie_zastepczy_werdykt(self):
+        with self.assertRaises(BladModelu):
+            detektyw.osadz(WYMOWKA, "X", "P?", "r", wywolaj=Atrapa({**WERDYKT_OK, "werdykt": "winna"}, "zle"))
 
-    def test_bank_przy_uniewinnieniu(self):
-        w = detektyw.osadz(WYMOWKA, "X", "P?", uniewinnienie=True, wywolaj=Atrapa(RuntimeError("x")))
-        self.assertEqual((w["werdykt"], w["zrodlo"]), ("uniewinniona", "bank"))
+    def test_awaria_przy_uniewinnieniu_to_blad(self):
+        with self.assertRaises(BladModelu):
+            detektyw.osadz(WYMOWKA, "X", "P?", uniewinnienie=True, wywolaj=Atrapa(RuntimeError("x")))
+
+    def test_brak_zastepczych_tresci_i_nakazu_pracy(self):
+        self.assertFalse(hasattr(detektyw, "BANK"))
+        self.assertFalse(hasattr(detektyw, "WERDYKT_ZAPASOWY"))
 
 
 class TestNaSucho(unittest.TestCase):
@@ -137,7 +141,7 @@ class TestNaSucho(unittest.TestCase):
             staty = sucho.uruchom(raport=raport, wywolaj=wywolaj, wypisz=lambda s: None)
             tekst = raport.read_text(encoding="utf-8")
         self.assertGreaterEqual(staty["przypadki"], 15)
-        self.assertEqual(staty["z_banku"], 0)
+        self.assertEqual(staty["bledy_modelu"], 0)
         self.assertIn("JSON poprawny za 1. razem: 100%", tekst)
 
 

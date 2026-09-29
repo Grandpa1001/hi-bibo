@@ -34,7 +34,7 @@ export function Start() {
       </div>
 
       <div class="tryby">
-        {(hub?.tryby ?? [{ id: "detektyw", nazwa: "Bibotektyw", opis: "Przesłuchaj wymówkę, która Cię blokuje", aktywny: true }]).map((t) => (
+        {(hub?.tryby ?? [{ id: "detektyw", nazwa: "Bibotektyw", opis: "Sprawdź, co Cię zatrzymuje, i znajdź mały krok", aktywny: true }]).map((t) => (
           <button type="button" key={t.id} class={`tryb ${t.aktywny ? "on" : ""}`} disabled={!t.aktywny}
                   onClick={t.aktywny ? nowaSprawa : undefined}>
             <span class="tryb-ikona"><Postac poza={POZY[t.id] ?? "logo"} /></span>
@@ -47,7 +47,6 @@ export function Start() {
       {s && s.zamkniete > 0 && (
         <div class="statystyki">
           <div><strong>{s.zamkniete}</strong><span>spraw zamkniętych</span></div>
-          <div><strong>{s.obalone}</strong><span>wymówek obalonych</span></div>
           <div><strong>{s.najczestszy?.emoji ?? "—"}</strong><span>najczęstszy podejrzany</span></div>
         </div>
       )}

@@ -23,7 +23,7 @@ export function Kartoteka() {
       <div class="kartoteka-naglowek">
         <div>
           <h1>Kartoteka</h1>
-          <p>{lider ? <>Najczęstszy recydywista: {lider.emoji} {lider.nazwa}.</> : "Jeszcze pusto. Pierwsza sprawa czeka."}</p>
+          <p>{lider ? <>Najczęściej wracający podejrzany: {lider.emoji} {lider.nazwa}.</> : "Jeszcze pusto. Pierwsza sprawa czeka."}</p>
         </div>
         <Postac poza="detektyw" />
       </div>
@@ -34,7 +34,7 @@ export function Kartoteka() {
               <div class="teczka" style={{ "--obrot": OBROT[i % OBROT.length] }} key={p.nazwa}>
                 <span class="teczka-emoji">{p.emoji}</span>
                 <b>{p.nazwa}</b>
-                <small>{p.zatrzymania} × zatrzymany · {p.obalone} obal.</small>
+                <small>{p.zatrzymania} × zatrzymany</small>
                 <div class="kwadraty" aria-label={`${p.zatrzymania} zatrzymań, ${p.ruszylo} z ruszeniem`}>
                   {Array.from({ length: Math.min(p.zatrzymania, 10) }, (_, j) => <i class={j < p.ruszylo ? "ok" : ""} />)}
                 </div>
@@ -43,7 +43,7 @@ export function Kartoteka() {
           </div>
           <div class="legenda">
             <span><i /> zatrzymanie</span>
-            <span><i class="ok" /> obalona + ruszyło</span>
+            <span><i class="ok" /> ruszyło</span>
           </div>
         </>
       )}

@@ -15,6 +15,7 @@ from aiohttp import web
 
 from . import auth, czat, gateway_most, magazyn
 from .telegram import BladTelegrama, EFEKT_KONFETTI, token
+from .llm import BladModelu
 from .tryby import detektyw
 
 log = logging.getLogger("bibo-tryby")
@@ -71,7 +72,7 @@ KOMUNIKATY = {
     "stan": "Ta sprawa jest w innym etapie — otwórz ją od początku.",
     "dane": "Coś się nie zgadza w danych. Spróbuj ponownie.",
     "limit": "Za dużo zapytań w tej godzinie — spróbuj później.",
-    "model": "Śledczy chwilowo milczy. Spróbuj ponownie.",
+    "model": "Nie udało się teraz dokończyć. Możesz spróbować jeszcze raz albo wyjść — nic się nie zapisało.",
 }
 
 
@@ -117,11 +118,14 @@ def _wywolaj(request: web.Request):
 
 
 async def _haiku(request: web.Request, uid: str, fn, *args, **kwargs) -> dict:
-    """Uruchamia model w executorze, z limitem 30/h (nie licząc odpowiedzi z banku)."""
+    """Uruchamia model w executorze, z limitem 30/h. Awaria modelu → 503 (bez zastępczej treści)."""
     if not magazyn.sprawdz_i_zapisz_limit(uid):
         raise BladApi(429, "limit")
     kwargs["wywolaj"] = _wywolaj(request)
-    return await asyncio.get_running_loop().run_in_executor(None, lambda: fn(*args, **kwargs))
+    try:
+        return await asyncio.get_running_loop().run_in_executor(None, lambda: fn(*args, **kwargs))
+    except BladModelu:
+        raise BladApi(503, "model")
 
 
 def _znajdz_sprawe(request: web.Request, uid: str) -> tuple[str, dict, dict]:

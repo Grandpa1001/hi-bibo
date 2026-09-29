@@ -35,12 +35,12 @@ function Zeznanie({ s }: { s: S }) {
   return (
     <div class="ekran">
       <Dymek poza="skupienie" etykieta="Bibo · detektyw">
-        <p>Na krześle siedzi wymówka, nie Ty. Jak dokładnie brzmi? Tak, jak mówisz ją sobie w głowie.</p>
+        <p>Na krześle siedzi myśl, która Cię zatrzymuje, nie Ty. Jak dokładnie brzmi? Tak, jak mówisz ją sobie w głowie.</p>
       </Dymek>
       <Panel>
         <Etykieta lewa={`Sprawa #${s.numer}`} prawa={data()} />
-        <h2>Zeznanie wymówki</h2>
-        <label class="lbl" for="wymowka">Wymówka mówi:</label>
+        <h2>Zeznanie</h2>
+        <label class="lbl" for="wymowka">Ta myśl mówi:</label>
         <textarea id="wymowka" rows={4} maxLength={500} value={s.wymowka}
                   placeholder="np. Zacznę, jak ogarnę wszystko inne…"
                   onInput={(e) => wpiszWymowke((e.target as HTMLTextAreaElement).value)} />
@@ -75,7 +75,7 @@ function Przesluchanie({ s }: { s: S }) {
       <Dymek poza="detektyw" etykieta="Pytanie śledczego"><p>{z.pytanie}</p></Dymek>
 
       <div>
-        <label class="lbl" for="riposta">Twoja riposta</label>
+        <label class="lbl" for="riposta">Twoja odpowiedź</label>
         <textarea id="riposta" rows={3} maxLength={500} value={s.riposta}
                   onInput={(e) => wpiszRiposte((e.target as HTMLTextAreaElement).value)} />
       </div>

@@ -36,7 +36,7 @@ const KOMUNIKATY: Record<string, string> = {
   uzytkownik: "Ta Mini App należy do innego Bibo.",
   sprawa: "Tej sprawy już nie ma w aktach.",
   limit: "Dużo śledztw jak na godzinę. Odpocznij chwilę i wróć.",
-  model: "Bibo się zawiesił. Spróbuj jeszcze raz za moment.",
+  model: "Nie udało się teraz dokończyć. Możesz spróbować jeszcze raz albo wyjść — nic się nie zapisało.",
   siec: "Brak połączenia z Bibo. Spróbuj jeszcze raz.",
 };
 
@@ -97,7 +97,7 @@ function sztuczne(): Api {
       await czekaj(250);
       return {
         tryby: [
-          { id: "detektyw", nazwa: "Bibotektyw", opis: "Przesłuchaj wymówkę, która Cię blokuje", aktywny: true },
+          { id: "detektyw", nazwa: "Bibotektyw", opis: "Sprawdź, co Cię zatrzymuje, i znajdź mały krok", aktywny: true },
           { id: "misja10", nazwa: "Misja 10 minut", opis: "Tylko 10 minut, potem wolno przestać", aktywny: false },
           { id: "zrzut", nazwa: "Zrzut z głowy", opis: "Wszystko na stół, wybierasz jedno", aktywny: false },
         ],

@@ -1,7 +1,7 @@
 """Wywołanie Haiku przez Hermesa → JSON → walidacja → jedna ponowna próba.
 
 Zwraca `(dane, proby)`: `dane` to zwalidowany słownik albo None (wtedy tryb
-sięga do banku zapasowego), `proby` to liczba wywołań modelu (do raportu na sucho).
+zgłasza `BladModelu` — bez zastępczej treści), `proby` to liczba wywołań modelu (do raportu na sucho).
 """
 from __future__ import annotations
 
@@ -16,13 +16,18 @@ Wywolanie = Callable[[list[dict], float, int], str]
 Walidator = Callable[[dict], dict]
 
 
+class BladModelu(Exception):
+    """Model nie dał użytecznej odpowiedzi. Zamiast zastępczego werdyktu
+    użytkownik dostaje neutralny komunikat i może ponowić albo wyjść."""
+
+
 class BladWalidacji(ValueError):
     pass
 
 
 class BladStylu(BladWalidacji):
     """Odpowiedź poprawna, ale z usterką stylu: prosimy o poprawkę, a przy ostatniej
-    próbie przyjmujemy ją mimo to (styl nie może spychać gry do banku zapasowego)."""
+    próbie przyjmujemy ją mimo to (styl nie może kończyć gry błędem)."""
 
     def __init__(self, komunikat: str, dane: dict):
         super().__init__(komunikat)
@@ -63,7 +68,7 @@ def zapytaj(system: str, user: str, waliduj: Walidator, *, temperature: float,
             max_tokens: int = 300, wywolaj: Wywolanie | None = None, proby: int = 2) -> tuple[dict | None, int]:
     wywolaj = wywolaj or wywolaj_haiku
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-    z_usterka: dict | None = None   # poprawna treść z usterką stylu — lepsza niż bank
+    z_usterka: dict | None = None   # poprawna treść z usterką stylu — lepsza niż błąd
     for nr in range(1, proby + 1):
         try:
             tekst = wywolaj(messages, temperature, max_tokens)
