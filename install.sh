@@ -106,7 +106,7 @@ echo "Wbudowane skille usunięte ✓"
 # Uzasadnienie każdej wartości: config.yaml w repo i docs/REANALIZA.md.
 say "Ustawienia (lekki prompt, pamięć, puls)"
 settings=(
-  "platform_toolsets.telegram=[memory]"
+  "platform_toolsets.telegram=[memory,bibo_karta]"
   "platform_toolsets.cron=[memory]"
   "memory.memory_enabled=true"
   "memory.user_profile_enabled=true"

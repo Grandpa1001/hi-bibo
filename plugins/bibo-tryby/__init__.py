@@ -2,7 +2,8 @@
 
 Wtyczka dotyka Bibo w trzech miejscach, wszystkie opcjonalne:
 - `pre_gateway_dispatch` — zapamiętuje źródło rozmowy (nic nie przechwytuje),
-- `pre_llm_call` — dokleja zaległą notatkę z Mini App (fallback),
+- `pre_llm_call` — dokleja zaległą notatkę z Mini App (fallback) i krótkie
+  podsumowanie karty bieżącej sprawy,
 - `post_llm_call` — wykrywa znacznik propozycji `[[tryb:detektyw]]`
   (znacznik z tekstu usuwa `bibo-podpis`; `transform_llm_output` bierze tylko
   pierwszą podmianę, więc nie konkurujemy z podpisem).
@@ -14,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from . import czat, gateway_most, uslugi
+from . import czat, gateway_most, karta_narzedzie, uslugi
 
 log = logging.getLogger("bibo-tryby")
 ZNACZNIK = "[[tryb:detektyw]]"
@@ -31,12 +32,13 @@ def _na_wiadomosc(event=None, **_):
     return None
 
 
-def _przed_tura(platform: str = "", **_):
+def _przed_tura(platform: str = "", sender_id: str = "", **_):
     try:
         if platform == "telegram":
-            notatka = gateway_most.odbierz_notatki()
-            if notatka:
-                return {"context": notatka}
+            czesci = [gateway_most.odbierz_notatki(), karta_narzedzie.podsumowanie(sender_id)]
+            czesci = [c for c in czesci if c]
+            if czesci:
+                return {"context": "\n\n".join(czesci)}
     except Exception:
         log.debug("bibo-tryby: pre_llm_call", exc_info=True)
     return None
@@ -74,6 +76,10 @@ def register(ctx):
             defaults={"provider": "anthropic", "model": "claude-haiku-4-5"})
     except Exception as e:
         log.warning("bibo-tryby: nie zarejestrowano zadania auxiliary: %s", e)
+    try:
+        karta_narzedzie.zarejestruj(ctx)
+    except Exception as e:
+        log.warning("bibo-tryby: nie zarejestrowano narzędzia bibo_karta: %s", e)
     ctx.register_hook("pre_gateway_dispatch", _na_wiadomosc)
     ctx.register_hook("pre_llm_call", _przed_tura)
     ctx.register_hook("post_llm_call", _po_turze)

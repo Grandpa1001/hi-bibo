@@ -16,7 +16,7 @@ model:
 # delegacja...) = ~41 KB schematów JSON w KAŻDYM zapytaniu. Bibo rozmawia
 # i pamięta — nic więcej nie potrzebuje.
 platform_toolsets:
-  telegram: [memory]
+  telegram: [memory, bibo_karta]   # bibo_karta: karta jednej bieżącej sprawy (wtyczka bibo-tryby)
   cron: [memory]
   cli: [memory]
 
