@@ -10,7 +10,10 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, str(Path(__file__).parent))
 from _ladowanie import podmodul  # noqa: E402
 
+import json  # noqa: E402
+
 kontrola = podmodul("bibo-tryby", "kontrola")
+kontakt = podmodul("bibo-tryby", "kontakt")
 magazyn = podmodul("bibo-tryby", "magazyn")
 
 
@@ -27,6 +30,9 @@ class Sprawdz(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self._stare = os.environ.get("HERMES_HOME")
         os.environ["HERMES_HOME"] = self.tmp.name
+        (Path(self.tmp.name) / "local").mkdir()
+        # bez ciszy nocnej, żeby testy nie zależały od pory dnia
+        (Path(self.tmp.name) / "local" / "bibo_pulse.json").write_text(json.dumps({"quiet_from": 0, "quiet_to": 0}))
 
     def tearDown(self):
         if self._stare is None:
@@ -50,6 +56,16 @@ class Sprawdz(unittest.IsolatedAsyncioTestCase):
         u.bot.wiadomosc_z_aplikacja.assert_awaited_once()
         stan = magazyn.sprawy()
         self.assertTrue(stan["s_a"]["kontrola_wyslana"])
+
+    async def test_pauza_pomija_kontrole_i_nie_odklada_jej_na_potem(self):
+        u = uslugi_atrapa()
+        self._zapisz_sprawe("s_a", kontrola=magazyn.iso(magazyn.teraz() - timedelta(minutes=1)))
+        kontakt.ustaw_pauze(1)
+        self.assertEqual(await kontrola.sprawdz(u), 0)
+        kontakt.zakoncz_pauze()
+        self.assertEqual(await kontrola.sprawdz(u), 0)
+        u.bot.wiadomosc_z_aplikacja.assert_not_awaited()
+        self.assertTrue(magazyn.sprawy()["s_a"]["kontrola_wyslana"])
 
     async def test_nie_wysyla_ponownie(self):
         u = uslugi_atrapa()

@@ -4,7 +4,9 @@ Małe SQLite w `$HERMES_HOME/local/bibo_tryby/karta.sqlite3` (przeżywa aktualiz
 Nie dotyka pamięci Hermesa ani kartoteki Bibotektywa. Na właściciela przypada
 najwyżej jedna karta `aktywna`; zmiany są krótkimi transakcjami z kontrolą wersji
 rekordu, więc spóźniony zapis nie nadpisze nowszej decyzji ani nie przywróci
-usuniętej karty. Ten sam plik posłuży w przyroście 3 do check-inów.
+usuniętej karty. W tym samym pliku leży tabela `checkiny` (jeden oczekujący na kartę;
+obsługuje ją `checkin.py`). Zakończenie, odłożenie i usunięcie karty anuluje jej
+oczekujący check-in w tej samej transakcji.
 """
 from __future__ import annotations
 
@@ -34,6 +36,20 @@ CREATE TABLE IF NOT EXISTS karty (
     wersja INTEGER NOT NULL DEFAULT 1
 );
 CREATE UNIQUE INDEX IF NOT EXISTS jedna_aktywna ON karty (wlasciciel) WHERE status = 'aktywna';
+CREATE TABLE IF NOT EXISTS checkiny (
+    id TEXT PRIMARY KEY,
+    karta_id TEXT NOT NULL,
+    wlasciciel TEXT NOT NULL,
+    kanal TEXT NOT NULL DEFAULT 'telegram',
+    termin_utc TEXT NOT NULL,
+    strefa TEXT NOT NULL,
+    status TEXT NOT NULL,
+    proby INTEGER NOT NULL DEFAULT 0,
+    id_wiadomosci TEXT,
+    utworzono TEXT NOT NULL,
+    zaktualizowano TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS jeden_oczekujacy ON checkiny (karta_id) WHERE status IN ('oczekuje', 'wysylanie');
 """
 
 
@@ -57,8 +73,22 @@ def _polacz(sciezka: Path | None = None) -> sqlite3.Connection:
     db = sqlite3.connect(p, timeout=5, isolation_level=None)   # transakcje jawnie (BEGIN IMMEDIATE)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA journal_mode=WAL")
+    _kopia_przed_zmiana_schematu(db, p)
     db.executescript(_SCHEMAT)
     return db
+
+
+def _kopia_przed_zmiana_schematu(db: sqlite3.Connection, p: Path) -> None:
+    """Gdy istnieje baza sprzed check-inów, jednorazowo zapisuje jej kopię obok (powrót do poprzedniej wersji)."""
+    tabele = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "karty" in tabele and "checkiny" not in tabele:
+        kopia = p.with_name(p.name + ".przed-checkinami")
+        if not kopia.exists():
+            dst = sqlite3.connect(kopia)
+            try:
+                db.backup(dst)
+            finally:
+                dst.close()
 
 
 def _wiersz(r: sqlite3.Row | None) -> dict | None:
@@ -107,6 +137,11 @@ def aktywna(w: str, sciezka: Path | None = None) -> dict | None:
     return kart[0] if kart else None
 
 
+def _anuluj_checkiny(db: sqlite3.Connection, w: str, kid: str, status: str = "anulowany") -> None:
+    db.execute("UPDATE checkiny SET status=?, zaktualizowano=? WHERE karta_id=? AND wlasciciel=? AND status='oczekuje'",
+               (status, _teraz(), kid, w))
+
+
 def _zmien_status(db: sqlite3.Connection, w: str, kid: str, status: str, wersja: int | None) -> None:
     ograniczenie, arg = ("", ()) if wersja is None else (" AND wersja=?", (wersja,))
     n = db.execute("UPDATE karty SET status=?, zaktualizowano=?, wersja=wersja+1 WHERE id=? AND wlasciciel=?" + ograniczenie,
@@ -129,7 +164,9 @@ def utworz(w: str, pola: dict, *, poprzednia: str | None = None, sciezka: Path |
                 if not poprzednia:
                     raise BladKarty("jest_aktywna", "Jest już aktywna sprawa. Zapytaj usera, co z nią zrobić: "
                                     "odłożyć, zakończyć czy usunąć — i dopiero wtedy załóż nową.")
+                _anuluj_checkiny(db, w, stara["id"])
                 if poprzednia == "usun":
+                    db.execute("DELETE FROM checkiny WHERE karta_id=? AND wlasciciel=?", (stara["id"], w))
                     db.execute("DELETE FROM karty WHERE id=? AND wlasciciel=?", (stara["id"], w))
                 else:
                     _zmien_status(db, w, stara["id"], "odlozona" if poprzednia == "odloz" else "zakonczona", None)
@@ -186,6 +223,8 @@ def przenies(w: str, docelowy: str, *, wersja: int | None = None, sciezka: Path 
             if not k:
                 raise BladKarty("brak_karty", "Nie ma takiej sprawy.")
             _zmien_status(db, w, k["id"], docelowy, wersja)
+            if docelowy != "aktywna":
+                _anuluj_checkiny(db, w, k["id"])   # odłożenie/zakończenie kasuje termin (nowy trzeba wybrać jawnie)
             db.execute("COMMIT")
         except BaseException:
             db.execute("ROLLBACK")
@@ -196,9 +235,13 @@ def przenies(w: str, docelowy: str, *, wersja: int | None = None, sciezka: Path 
 def usun(w: str, *, tylko_aktywna: bool = True, sciezka: Path | None = None) -> int:
     """Usuwa kartę na stałe (aktywną; z `tylko_aktywna=False` także odłożone). Zwraca liczbę usuniętych."""
     w = _wymagaj_wlasciciela(w)
+    warunek = " AND status='aktywna'" if tylko_aktywna else ""
     with closing(_polacz(sciezka)) as db:
-        n = db.execute("DELETE FROM karty WHERE wlasciciel=?" + (" AND status='aktywna'" if tylko_aktywna else ""),
-                       (w,)).rowcount
+        db.execute("BEGIN IMMEDIATE")
+        db.execute("DELETE FROM checkiny WHERE wlasciciel=? AND karta_id IN "
+                   f"(SELECT id FROM karty WHERE wlasciciel=?{warunek})", (w, w))
+        n = db.execute("DELETE FROM karty WHERE wlasciciel=?" + warunek, (w,)).rowcount
+        db.execute("COMMIT")
     if n == 0:
         raise BladKarty("brak_karty", "Nie ma sprawy do usunięcia.")
     return n

@@ -27,6 +27,7 @@ from pathlib import Path
 PROFILE = Path(__file__).resolve().parent.parent
 STATE_FILE = PROFILE / "local" / "bibo_pulse_state.json"
 SETTINGS_FILE = PROFILE / "local" / "bibo_pulse.json"
+PAUSE_FILE = PROFILE / "local" / "bibo_pauza.json"   # ustawiana przez Bibo (narzędzie bibo_karta)
 
 DEFAULTS = {
     "enabled": True,
@@ -87,12 +88,23 @@ def in_quiet_hours(hour: int, q_from: int, q_to: int) -> bool:
     return q_from <= hour < q_to
 
 
-def decide(cfg: dict, state: dict, now: datetime, last_user: float | None, rnd: float) -> tuple[bool, str]:
+def paused_until(path: Path = PAUSE_FILE) -> datetime | None:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8")).get("do")
+        return datetime.fromisoformat(raw) if raw else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def decide(cfg: dict, state: dict, now: datetime, last_user: float | None, rnd: float,
+           paused: datetime | None = None) -> tuple[bool, str]:
     today = now.date().isoformat()
     if state.get("date") != today:
         state.update(date=today, count=0)
     if not cfg["enabled"]:
         return False, "wyłączone w ustawieniach"
+    if paused and now < paused:
+        return False, "pauza w kontakcie"
     if in_quiet_hours(now.hour, cfg["quiet_from"], cfg["quiet_to"]):
         return False, "cisza nocna"
     if state["count"] >= cfg["max_per_day"]:
@@ -130,7 +142,7 @@ def main() -> int:
     now = now_local(cfg["timezone"])
     last_user = last_user_message_ts(cfg["platform"])
 
-    wake, reason = decide(cfg, state, now, last_user, random.random())
+    wake, reason = decide(cfg, state, now, last_user, random.random(), paused_until())
     if wake:
         state["count"] += 1
         state["last_ts"] = now.timestamp()

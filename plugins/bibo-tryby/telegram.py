@@ -22,7 +22,11 @@ def token() -> str:
 
 
 class BladTelegrama(Exception):
-    pass
+    """Odpowiedź Bot API z `ok: false`. `kod` = error_code (brak → nieznany)."""
+
+    def __init__(self, komunikat: str = "", kod: int | None = None):
+        super().__init__(komunikat)
+        self.kod = kod
 
 
 class BotApi:
@@ -44,7 +48,7 @@ class BotApi:
             odp = await r.json(content_type=None)
         if not odp.get("ok"):
             # Nie logujemy URL-a — zawiera token.
-            raise BladTelegrama(f"{metoda}: {odp.get('error_code')} {odp.get('description')}")
+            raise BladTelegrama(f"{metoda}: {odp.get('error_code')} {odp.get('description')}", odp.get("error_code"))
         return odp["result"]
 
     async def ustaw_menu(self, url: str, tekst: str = "🎲 Tryby") -> None:
