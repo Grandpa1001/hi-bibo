@@ -1,10 +1,12 @@
 """bibo-tryby — tryby Bibo w Telegram Mini App (Bibotektyw).
 
 Wtyczka dotyka Bibo w trzech miejscach, wszystkie opcjonalne:
-- `pre_gateway_dispatch` — zapamiętuje źródło rozmowy (nic nie przechwytuje),
+- `pre_gateway_dispatch` — zapamiętuje źródło rozmowy; jedyne, co przechwytuje, to
+  stuknięcia w siatkę stanu dnia właściciela (`siatka.py`, bez udziału modelu),
 - `pre_llm_call` — dokleja zaległą notatkę z Mini App (fallback) i krótkie
   podsumowanie karty bieżącej sprawy,
-- `post_llm_call` — wykrywa znacznik propozycji `[[tryb:detektyw]]`
+- `post_llm_call` — raz dziennie, po pierwszej turze, pokazuje siatkę stanu dnia;
+  wykrywa znacznik propozycji `[[tryb:detektyw]]`
   (znacznik z tekstu usuwa `bibo-podpis`; `transform_llm_output` bierze tylko
   pierwszą podmianę, więc nie konkurujemy z podpisem).
 
@@ -15,10 +17,17 @@ from __future__ import annotations
 
 import logging
 
-from . import czat, gateway_most, karta_narzedzie, uslugi
+from . import czat, gateway_most, karta, karta_narzedzie, kontakt, siatka, stan, uslugi
 
 log = logging.getLogger("bibo-tryby")
 ZNACZNIK = "[[tryb:detektyw]]"
+_siatka_dzien: dict[str, object] = {}
+
+
+def _stan_wlasciciela(user_id: str) -> str | None:
+    """Id właściciela, gdy stan dnia jest włączony i dotyczy tego usera; inaczej None."""
+    w = karta.wlasciciel()
+    return w if w and str(user_id) == w and siatka.wlaczone() else None
 
 
 def _na_wiadomosc(event=None, **_):
@@ -27,8 +36,45 @@ def _na_wiadomosc(event=None, **_):
         platforma = getattr(getattr(src, "platform", None), "value", "")
         if src is not None and platforma == "telegram":
             gateway_most.zapamietaj_zrodlo(src)
+            tekst = getattr(event, "text", "") or ""
+            w = _stan_wlasciciela(getattr(src, "user_id", "")) if siatka.rozpoznaj(tekst) else None
+            u = uslugi.aktywne()
+            if w and u and u.bot and getattr(src, "chat_type", "dm") == "dm":
+                odp = siatka.obsluz(w, tekst)
+                if odp:
+                    u.zleć(siatka.wyslij(w, u, odp))
+                    return {"action": "skip", "reason": "bibo-stan: obsłużone przez siatkę"}
     except Exception:
         log.debug("bibo-tryby: pre_gateway_dispatch", exc_info=True)
+    return None
+
+
+def _pokaz_siatke_gdy_pierwsza_tura(platform: str) -> None:
+    """FR-1: raz dziennie, gdy dziś nie ma wpisu. Dzień już załatwiony pamiętamy w pamięci procesu,
+    więc kolejne tury tego dnia nie dotykają bazy."""
+    w = karta.wlasciciel()
+    if platform != "telegram" or not w or not siatka.wlaczone() or gateway_most.ostatni_user() != w:
+        return
+    dzien = kontakt.teraz().astimezone(kontakt.strefa()).date()
+    if _siatka_dzien.get(w) == dzien:
+        return
+    u = uslugi.aktywne()
+    if not (u and u.bot):
+        return   # usługi jeszcze wstają: spróbujemy przy następnej turze
+    _siatka_dzien[w] = dzien
+    if stan.czy_pokazac_siatke(w):
+        u.zleć(siatka.wyslij(w, u))
+
+
+def _komenda_stan(raw_args: str = "") -> str | None:
+    """FR-7: `/stan` pokazuje siatkę; nowy wpis zastępuje tryb z poprzedniego."""
+    w = karta.wlasciciel()
+    u = uslugi.aktywne()
+    if not w or not siatka.wlaczone():
+        return "Stan dnia jest niedostępny w tej instancji."
+    if not (u and u.bot):
+        return "Teraz nie mogę pokazać siatki — spróbuj za chwilę."
+    u.zleć(siatka.wyslij(w, u))
     return None
 
 
@@ -45,6 +91,10 @@ def _przed_tura(platform: str = "", sender_id: str = "", **_):
 
 
 def _po_turze(assistant_response: str = "", platform: str = "", **_):
+    try:
+        _pokaz_siatke_gdy_pierwsza_tura(platform)
+    except Exception:
+        log.debug("bibo-tryby: siatka po turze", exc_info=True)
     try:
         if platform != "telegram" or ZNACZNIK not in (assistant_response or ""):
             return
@@ -83,5 +133,6 @@ def register(ctx):
     ctx.register_hook("pre_gateway_dispatch", _na_wiadomosc)
     ctx.register_hook("pre_llm_call", _przed_tura)
     ctx.register_hook("post_llm_call", _po_turze)
+    ctx.register_command("stan", _komenda_stan, description="Bibo: jak się dziś czujesz (siatka stanu)")
     ctx.register_command("bt_diag", _komenda_diagnostyka, description="Bibotektyw: diagnostyka wtyczki")
     uslugi.uruchom_gdy_gateway()

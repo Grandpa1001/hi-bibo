@@ -17,6 +17,7 @@ DOMYSLNE_USTAWIENIA = {
     "kontrola_min": 10,
     "limit_haiku_na_godzine": 30,
     "strefa": "Europe/Warsaw",
+    "stan": True,               # wpisy stanu dnia (siatka w rozmowie); false = Bibo nic nie pokazuje ani nie przechwytuje
 }
 
 PODEJRZANI_STARTOWI = [

@@ -68,7 +68,14 @@ CREATE TABLE IF NOT EXISTS sygnaly_stanu (
     potwierdzone INTEGER
 );
 CREATE INDEX IF NOT EXISTS sygnaly_stanu_czas ON sygnaly_stanu (wlasciciel, utworzono);
+CREATE TABLE IF NOT EXISTS siatka_pokazana (
+    wlasciciel TEXT NOT NULL,
+    dzien TEXT NOT NULL,
+    PRIMARY KEY (wlasciciel, dzien)
+);
 """
+_gotowe: set[str] = set()   # bazy ze świeżo sprawdzonym schematem: nie powtarzamy go przy każdej turze
+DNI_POKAZU = 14
 
 
 class BladStanu(Exception):
@@ -90,8 +97,10 @@ def _polacz(sciezka: Path | None = None) -> sqlite3.Connection:
     p = sciezka or magazyn.katalog() / "stan.sqlite3"
     db = sqlite3.connect(p, timeout=5, isolation_level=None)
     db.row_factory = sqlite3.Row
-    db.execute("PRAGMA journal_mode=WAL")
-    db.executescript(_SCHEMAT)
+    if str(p) not in _gotowe:
+        db.execute("PRAGMA journal_mode=WAL")
+        db.executescript(_SCHEMAT)
+        _gotowe.add(str(p))
     return db
 
 
@@ -235,6 +244,28 @@ def tydzien(w: str, *, teraz: datetime | None = None, sciezka: Path | None = Non
         c, u = ostatni.get(d, (None, None))
         wynik.append({"dzien": d.isoformat(), "cwiartka": c, "uwaga": u})
     return wynik
+
+
+def czy_pokazac_siatke(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> bool:
+    """FR-1: True najwyżej raz dziennie i tylko, gdy dziś nie ma jeszcze wpisu. Zapis „pokazano”
+    następuje razem ze sprawdzeniem, więc kolejna tura tego samego dnia nie powtarza siatki
+    (ignorowana siatka nie wraca tego dnia: brak ponagleń, FR-6)."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    dzien = teraz.astimezone(kontakt.strefa()).date()
+    with closing(_polacz(sciezka)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            pokazac = _ostatni_dzis(db, w, teraz) is None and db.execute(
+                "SELECT 1 FROM siatka_pokazana WHERE wlasciciel=? AND dzien=?", (w, dzien.isoformat())).fetchone() is None
+            if pokazac:
+                db.execute("INSERT INTO siatka_pokazana (wlasciciel, dzien) VALUES (?,?)", (w, dzien.isoformat()))
+                db.execute("DELETE FROM siatka_pokazana WHERE dzien<?", ((dzien - timedelta(days=DNI_POKAZU)).isoformat(),))
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+    return pokazac
 
 
 # --- sygnały gorszego dnia / uwagi ------------------------------------------------
