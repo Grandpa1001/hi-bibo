@@ -2,7 +2,8 @@
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import { drugi, drugiNatywny, glowny, mock, popupMock, wstecz, wTelegramie, type Przycisk } from "../tg";
-import { blad } from "../stan";
+import { blad, idz } from "../stan";
+import { IkonaDzis, IkonaGry } from "./Ikony";
 
 export type Poza = "logo" | "detektyw" | "mysli" | "radosc" | "skupienie" | "ruch";
 
@@ -116,5 +117,17 @@ export function Czekanie({ poza, tekst, podpis }: { poza: Poza; tekst: string; p
       <p>{tekst}</p>
       <small>{podpis}</small>
     </div>
+  );
+}
+
+/** Główne zakładki aplikacji Bibo. Przełączenie zastępuje wpis historii, więc „wstecz” nie skacze po zakładkach. */
+export function Zakladki({ aktywna }: { aktywna: "dzis" | "gry" }) {
+  return (
+    <nav class="zakladki" aria-label="Sekcje aplikacji">
+      <button type="button" aria-current={aktywna === "dzis" ? "page" : undefined} class={aktywna === "dzis" ? "wybrana" : ""}
+              onClick={() => idz("dzis", true)}><IkonaDzis rozmiar={20} /> Dziś</button>
+      <button type="button" aria-current={aktywna === "gry" ? "page" : undefined} class={aktywna === "gry" ? "wybrana" : ""}
+              onClick={() => idz("gry", true)}><IkonaGry rozmiar={20} /> Gry</button>
+    </nav>
   );
 }

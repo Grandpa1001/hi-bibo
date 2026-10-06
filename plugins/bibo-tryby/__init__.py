@@ -159,7 +159,7 @@ def _komenda_diagnostyka(raw_args: str = "") -> str:
         return "bibo-tryby: usługi nie działają w tym procesie (czy gateway jest uruchomiony?)."
     return (f"bibo-tryby {u.ust.get('port')} · tunel: {u.url or 'brak (sprawdź cloudflared)'}\n"
             f"gateway: runner={d['runner']} pętla={d['petla']} telegram={d['adapter_telegram']}\n"
-            f"Otwórz Mini App przyciskiem „🎲 Tryby” obok pola wiadomości.")
+            f"Otwórz Mini App przyciskiem „Bibo” obok pola wiadomości.")
 
 
 def register(ctx):

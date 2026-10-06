@@ -257,7 +257,7 @@ if yes "Włączyć Tryby?"; then
   hermes plugins enable bibo-tryby --no-allow-tool-override >/dev/null 2>&1 \
     && echo "Wtyczka bibo-tryby ✓" \
     || echo "UWAGA: włącz ręcznie: hermes plugins enable bibo-tryby"
-  echo "Po restarcie Bibo w Telegramie pojawi się przycisk „🎲 Tryby” obok pola wiadomości."
+  echo "Po restarcie Bibo w Telegramie pojawi się przycisk „Bibo” obok pola wiadomości."
 else
   if hermes plugins list 2>/dev/null | grep -q '^bibo-tryby'; then
     hermes plugins disable bibo-tryby >/dev/null 2>&1 || true

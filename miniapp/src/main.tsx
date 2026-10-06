@@ -2,17 +2,19 @@ import "./fonty.css";
 import "./styl.css";
 
 import { render } from "preact";
-import { Kartoteka } from "./ekrany/Kartoteka";
+import { Detektyw } from "./ekrany/Detektyw";
+import { Dzis } from "./ekrany/Dzis";
+import { Gry } from "./ekrany/Gry";
 import { Kontrola } from "./ekrany/Kontrola";
 import { Sprawa } from "./ekrany/Sprawa";
-import { Start } from "./ekrany/Start";
+import { Stan } from "./ekrany/Stan";
 import { trasa } from "./stan";
 import { mock, start, sztuczneApi, wTelegramie, zamknieta } from "./tg";
-import { Blad, NaglowekMock, PasekDolny, Postac, PopupMock } from "./ui/ui";
+import { Blad, NaglowekMock, PasekDolny, Postac, PopupMock, Zakladki } from "./ui/ui";
 
 start();
 
-const TYTULY = { start: "Bibo", sprawa: "Bibotektyw", kartoteka: "Kartoteka", kontrola: "Kontrola" } as const;
+const TYTULY = { dzis: "Bibo", gry: "Bibo", detektyw: "Bibotektyw", sprawa: "Bibotektyw", kontrola: "Kontrola", stan: "Stan dnia" } as const;
 
 function App() {
   if (!wTelegramie && !mock) {
@@ -20,7 +22,7 @@ function App() {
       <div class="ekran srodek">
         <Postac poza="logo" klasa="duza" opis="Bibo" />
         <h2>Otwórz z czatu z Bibo</h2>
-        <p>Ta aplikacja działa w Telegramie — użyj przycisku <b>🎲 Tryby</b> obok pola wiadomości.</p>
+        <p>Ta aplikacja działa w Telegramie — użyj przycisku <b>Bibo</b> obok pola wiadomości.</p>
       </div>
     );
   }
@@ -37,13 +39,18 @@ function App() {
   const t = trasa.value;
   return (
     <>
-      <NaglowekMock tytul={TYTULY[t.ekran]} />
-      {wTelegramie && sztuczneApi && <div class="demo">Tryb demo · odpowiedzi Bibo są udawane</div>}
+      <div class="gora">
+        <NaglowekMock tytul={TYTULY[t.ekran]} />
+        {wTelegramie && sztuczneApi && <div class="demo">Tryb demo · odpowiedzi Bibo są udawane</div>}
+        {(t.ekran === "dzis" || t.ekran === "gry" || t.ekran === "detektyw") && <Zakladki aktywna={t.ekran === "dzis" ? "dzis" : "gry"} />}
+      </div>
       <main class="tresc">
-        {t.ekran === "start" && <Start />}
+        {t.ekran === "dzis" && <Dzis />}
+        {t.ekran === "gry" && <Gry />}
+        {t.ekran === "detektyw" && <Detektyw zakladka={t.zakladka} />}
         {t.ekran === "sprawa" && <Sprawa />}
-        {t.ekran === "kartoteka" && <Kartoteka />}
         {t.ekran === "kontrola" && <Kontrola id={t.id} />}
+        {t.ekran === "stan" && <Stan />}
         <Blad />
       </main>
       <PasekDolny />

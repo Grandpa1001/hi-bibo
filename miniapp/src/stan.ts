@@ -5,29 +5,43 @@ import { haptyka, potwierdzanieZamkniecia, startParam, szkic, zamknij } from "./
 
 // --- trasy -------------------------------------------------------------------
 
+export type ZakladkaDetektywa = "sledztwo" | "kartoteka";
+
 export type Trasa =
-  | { ekran: "start" }
+  | { ekran: "dzis" }
+  | { ekran: "gry" }
+  | { ekran: "detektyw"; zakladka: ZakladkaDetektywa }
   | { ekran: "sprawa" }
-  | { ekran: "kartoteka" }
-  | { ekran: "kontrola"; id: string };
+  | { ekran: "kontrola"; id: string }
+  | { ekran: "stan" };
 
 function czytajTrase(): Trasa {
   const h = location.hash.replace(/^#\/?/, "");
-  const [a, b] = h.split("/");
+  const [a, b, c] = h.split("/");
+  if (a === "gry" && b === "detektyw") return { ekran: "detektyw", zakladka: c === "kartoteka" ? "kartoteka" : "sledztwo" };
+  if (a === "gry") return { ekran: "gry" };
+  if (a === "kartoteka") return { ekran: "detektyw", zakladka: "kartoteka" };   // stary adres
   if (a === "sprawa") return { ekran: "sprawa" };
-  if (a === "kartoteka") return { ekran: "kartoteka" };
+  if (a === "stan") return { ekran: "stan" };
   if (a === "kontrola" && b) return { ekran: "kontrola", id: decodeURIComponent(b) };
   // Link t.me/<bot>/<app>?startapp=kontrola_<id> (poza MVP, ale nic nie kosztuje)
   const m = /^kontrola_(.+)$/.exec(startParam);
   if (!h && m) return { ekran: "kontrola", id: m[1] };
-  return { ekran: "start" };
+  return { ekran: "dzis" };
 }
 
 export const trasa = signal<Trasa>(czytajTrase());
 addEventListener("hashchange", () => { trasa.value = czytajTrase(); });
 
-export function idz(t: "start" | "sprawa" | "kartoteka") {
-  location.hash = t === "start" ? "#/" : `#/${t}`;
+const ADRESY = {
+  dzis: "#/", gry: "#/gry", detektyw: "#/gry/detektyw", kartoteka: "#/gry/detektyw/kartoteka", sprawa: "#/sprawa", stan: "#/stan",
+} as const;
+export type Cel = keyof typeof ADRESY;
+
+/** Przełączanie zakładek zastępuje wpis w historii (nie budujemy stosu „wstecz” z kliknięć w zakładki). */
+export function idz(cel: Cel, zakladka = false) {
+  if (zakladka) location.replace(ADRESY[cel]);
+  else location.hash = ADRESY[cel];
 }
 
 // --- sprawa ------------------------------------------------------------------
@@ -153,5 +167,5 @@ export function porzucSprawe() {
   sprawa.value = null;
   blad.value = null;
   potwierdzanieZamkniecia(false);
-  idz("start");
+  idz("detektyw");
 }

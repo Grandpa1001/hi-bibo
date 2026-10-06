@@ -51,8 +51,9 @@ It does not work on Pro at all.
 and per proactive nudge, a timeline of memory writes, and its support plan (`--opinia` asks Bibo for a full
 opinion with one model call).
 
-**Modes / Mini App (Bibotektyw):** optional plugin `bibo-tryby` puts a „🎲 Tryby” button next to your
-Telegram input. It opens a Mini App with a game where you interrogate the excuse blocking you: Bibo
+**Bibo Mini App (day state + games):** optional plugin `bibo-tryby` puts a „Bibo” button next to your
+Telegram input. It opens a Mini App with two tabs: **Today** (a one-tap day-state check-in and a 7-day widget)
+and **Games**. The first game interrogates the excuse blocking you: Bibo
 plays detective, delivers a verdict and gives you one tiny next step. After you close the case Bibo
 messages you in chat and checks back in 10 minutes. Runs on your own bot over a free Cloudflare quick
 tunnel (no domain, no account), ~2 × Haiku per case, data stays in `~/.hermes/local/bibo_tryby/`.

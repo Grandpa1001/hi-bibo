@@ -7,7 +7,7 @@ czy model poprawnie wywoła narzędzie. Potwierdzenie wychodzi dopiero po zapisi
 
 Siatka 4×4 bez pola środkowego: wiersz = energia (⚡⚡ → 🌙🌙), kolumna = samopoczucie
 (😣 → 😄), czyli osie −2, −1, 1, 2. Dzięki temu każde pole ma jednoznaczną ćwiartkę.
-Słowa z FR-2 mają prefiks 💭, a „Pomiń” prefiks ⏭, żeby zwykła wiadomość usera
+Słowa z FR-2 mają prefiks 💭, a „Pomiń” prefiks ⏩, żeby zwykła wiadomość usera
 (np. „zmęczony”) nigdy nie została wzięta za odpowiedź na klawiaturę.
 """
 from __future__ import annotations
@@ -22,10 +22,10 @@ log = logging.getLogger("bibo-tryby")
 
 ENERGIA = {2: "⚡⚡", 1: "⚡", -1: "🌙", -2: "🌙🌙"}
 PRZYJEMNOSC = {-2: "😣", -1: "🙁", 1: "🙂", 2: "😄"}
-PRZYCISK_POMIN = "⏭ Pomiń"
+PRZYCISK_POMIN = "⏩ Pomiń"
 PREFIKS_SLOWA = "💭 "
 PREFIKS_NOTATKI = "notatka:"
-FOKUS = {"🌫 Rozproszony": "hypofocus", "👌 W normie": "normal", "🎯 Hiperfokus": "hyperfocus"}
+FOKUS = {"🌀 Rozproszony": "hypofocus", "👌 W normie": "normal", "🎯 Hiperfokus": "hyperfocus"}
 
 WIERSZE = (2, 1, -1, -2)
 KOLUMNY = (-2, -1, 1, 2)
@@ -82,16 +82,21 @@ def _po_tapnieciu(w: str, e: int, p: int, teraz, sciezka) -> dict:
                 "Słowo i stan uwagi są opcjonalne — bez wyboru zostaje „W normie”.", _klawiatura_po_wpisie(r["cwiartka"]))
 
 
+def _norm(tekst: str | None) -> str:
+    """Telegram bywa dokłada selektor wariantu emoji (U+FE0F); klucze klawiatury go nie mają."""
+    return (tekst or "").replace("\ufe0f", "").strip()
+
+
 def rozpoznaj(tekst: str) -> bool:
     """Szybka bramka bez bazy: czy to w ogóle może być wiadomość z klawiatury stanu."""
-    t = (tekst or "").strip()
+    t = _norm(tekst)
     return t in POLA or t in SLOWA or t in FOKUS or t == PRZYCISK_POMIN or t.lower().startswith(PREFIKS_NOTATKI)
 
 
 def obsluz(w: str, tekst: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict | None:
     """Zwraca odpowiedź do wysłania ({text, reply_markup}) albo None, gdy wiadomość nie jest nasza
     (wtedy trafia do Bibo bez zmian). Błąd zapisu daje uczciwy komunikat, że nic nie zapisano."""
-    t = (tekst or "").strip()
+    t = _norm(tekst)
     try:
         if t in POLA:
             return _po_tapnieciu(w, *POLA[t], teraz, sciezka)

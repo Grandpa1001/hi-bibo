@@ -11,6 +11,13 @@ Nic nie diagnozuje: nazywa tryb dnia, nie stan zdrowia.
   Notatkę dopiszesz wiadomością zaczynającą się od `notatka:`.
 - Zignorowana siatka tego dnia nie wraca i nie ma przypomnień.
 
+## Widget w Mini App
+
+Na zakładce „Dziś” w Mini App (przycisk „Bibo” obok pola wiadomości) widget pokazuje dzisiejszy tryb w kolorze ćwiartki, punkt na siatce,
+ikonę stanu uwagi i 7 ostatnich dni (kropka = ostatni wpis dnia, przerywana = brak wpisu). Stuknięcie otwiera siatkę
+4×4; po wpisie od razu widać reakcję Bibo i opcjonalne chipy uwagi oraz słowa. Wpisy z Mini App mają źródło `widget`.
+Tryb zawsze ma nazwę obok koloru. Widget nie pokazuje się, gdy `stan` jest wyłączony albo gdy profil nie ma jednego właściciela.
+
 ## Tryb dnia
 
 | Siatka | Tryb | Bibo proponuje | Duże decyzje | Styl |
@@ -25,7 +32,7 @@ tylko dla właściciela i tylko gdy dziś jest wpis.
 
 ## Stan uwagi
 
-Uwaga to osobna oś od nastroju. Po stuknięciu w siatkę klawiatura ma jeden rząd: 🌫 Rozproszony · 👌 W normie · 🎯 Hiperfokus.
+Uwaga to osobna oś od nastroju. Po stuknięciu w siatkę klawiatura ma jeden rząd: 🌀 Rozproszony · 👌 W normie · 🎯 Hiperfokus.
 Bez wyboru zostaje „W normie”. W ciągu dnia: `/fokus` (przyciski) albo `/fokus hiper`, `/fokus rozproszony`, `/fokus norma`.
 Zmiana uwagi dodaje nowy wpis z tymi samymi osiami, więc tryb dnia się nie zmienia.
 

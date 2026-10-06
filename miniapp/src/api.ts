@@ -16,6 +16,17 @@ export type Kartoteka = {
   sprawy: { numer: number; podejrzany: string; werdykt: Werdykt; ruszylo: boolean | null; data: string }[];
 };
 
+export type Cwiartka = "peak" | "steady" | "tension" | "recovery";
+export type Uwaga = "hypofocus" | "normal" | "hyperfocus";
+export type StanDzis = {
+  cwiartka: Cwiartka; nazwa: string; energia: number; przyjemnosc: number; uwaga: Uwaga; slowo: string | null; slowa: string[];
+};
+export type StanDzien = { dzien: string; cwiartka: Cwiartka | null; uwaga: Uwaga | null };
+/** `wlaczone: false` = widget się nie pokazuje (funkcja wyłączona albo to nie właściciel). */
+export type StanWidok = {
+  wlaczone: boolean; dzis?: StanDzis | null; tydzien?: StanDzien[]; reakcja?: string; komunikat?: string;
+};
+
 export class BladApi extends Error {
   constructor(public kod: string, public status: number, komunikat: string) { super(komunikat); }
 }
@@ -29,12 +40,19 @@ export interface Api {
   sprawa(id: string): Promise<SprawaInfo>;
   kontrola(id: string, ruszylo: boolean): Promise<{ ok: true }>;
   kartoteka(): Promise<Kartoteka>;
+  stan(): Promise<StanWidok>;
+  stanWpis(energia: number, przyjemnosc: number): Promise<StanWidok>;
+  stanSlowo(slowo: string): Promise<StanWidok>;
+  stanUwaga(uwaga: Uwaga): Promise<StanWidok>;
 }
 
 const KOMUNIKATY: Record<string, string> = {
   podpis: "Sesja wygasła. Otwórz Bibotektywa jeszcze raz z czatu.",
   uzytkownik: "Ta Mini App należy do innego Bibo.",
   sprawa: "Tej sprawy już nie ma w aktach.",
+  wylaczone: "Ta funkcja jest wyłączona w ustawieniach.",
+  brak_wpisu: "Najpierw wpis na siatce.",
+  dane: "Coś się nie zgadza w danych. Spróbuj jeszcze raz.",
   limit: "Dużo śledztw jak na godzinę. Odpocznij chwilę i wróć.",
   model: "Nie udało się teraz dokończyć. Możesz spróbować jeszcze raz albo wyjść — nic się nie zapisało.",
   siec: "Brak połączenia z Bibo. Spróbuj jeszcze raz.",
@@ -68,6 +86,10 @@ const prawdziwe: Api = {
   sprawa: (id) => zadanie("GET", `sprawa/${id}`),
   kontrola: (id, ruszylo) => zadanie("POST", `sprawa/${id}/kontrola`, { ruszylo }),
   kartoteka: () => zadanie("GET", "kartoteka"),
+  stan: () => zadanie("GET", "stan"),
+  stanWpis: (energia, przyjemnosc) => zadanie("POST", "stan", { energia, przyjemnosc }),
+  stanSlowo: (slowo) => zadanie("POST", "stan/doprecyzuj", { slowo }),
+  stanUwaga: (uwaga) => zadanie("POST", "stan/uwaga", { uwaga }),
 };
 
 // --- Sztuczne API (tryb mock) -------------------------------------------------
@@ -89,10 +111,68 @@ function klasyfikuj(t: string) {
   return "mgla";
 }
 
+// --- stan dnia w mocku: te same reguły co w `stan.py` / `tryb.py` ---
+
+const NAZWY_CWIARTEK: Record<Cwiartka, string> = { peak: "Szczyt", steady: "Stabilnie", tension: "Napięcie", recovery: "Regeneracja" };
+const SLOWA_CWIARTEK: Record<Cwiartka, string[]> = {
+  peak: ["pełen energii", "skupiony", "zadowolony", "zmotywowany"],
+  steady: ["spokojny", "odprężony", "wdzięczny", "zrównoważony"],
+  tension: ["zestresowany", "podenerwowany", "rozdrażniony", "niespokojny"],
+  recovery: ["zmęczony", "przygaszony", "wyczerpany", "smutny"],
+};
+const REAKCJE: Record<Cwiartka, string> = {
+  peak: "Jest paliwo, więc dziś możemy iść na pełny plan.\n👣 Zacznij od najważniejszej rzeczy na dziś.",
+  steady: "Spokojny, równy dzień — dobry na domykanie tego, co już ruszone.\n👣 Wybierz jedną ruszoną rzecz i zrób jej następny mały kawałek.",
+  tension: "Czuć napięcie, więc nie dokładam nic ponad to, co konieczne.\n👣 Zacznij od tego jednego, co najbardziej uwiera — na 10 minut.",
+  recovery: "Dziś liczy się oszczędzanie sił, nie plan.\n👣 Domknij jedną drobnostkę albo zrób 10 minut przerwy.",
+};
+
+export function cwiartkaZOsi(energia: number, przyjemnosc: number): Cwiartka {
+  const przyjemnie = przyjemnosc >= 0;
+  return energia > 0 ? (przyjemnie ? "peak" : "tension") : (przyjemnie ? "steady" : "recovery");
+}
+
+function sztucznyStan() {
+  const dzien = (przes: number) => { const d = new Date(Date.now() + przes * 86_400_000); return d.toISOString().slice(0, 10); };
+  const poprzednie: (Cwiartka | null)[] = ["steady", "tension", null, "recovery", "peak", "steady"];
+  let dzis: StanDzis | null = null;
+  const widok = (dodatek: Partial<StanWidok> = {}): StanWidok => ({
+    wlaczone: true, dzis,
+    tydzien: [...poprzednie.map((c, i) => ({ dzien: dzien(i - 6), cwiartka: c, uwaga: c ? "normal" as Uwaga : null })),
+              { dzien: dzien(0), cwiartka: dzis?.cwiartka ?? null, uwaga: dzis?.uwaga ?? null }],
+    ...dodatek,
+  });
+  return {
+    async stan() { await czekaj(200); return widok(); },
+    async stanWpis(energia: number, przyjemnosc: number) {
+      await czekaj(250);
+      const c = cwiartkaZOsi(energia, przyjemnosc);
+      dzis = { cwiartka: c, nazwa: NAZWY_CWIARTEK[c], energia, przyjemnosc, uwaga: "normal", slowo: null, slowa: SLOWA_CWIARTEK[c] };
+      return widok({ reakcja: REAKCJE[c] });
+    },
+    async stanSlowo(slowo: string) {
+      await czekaj(150);
+      if (dzis) dzis = { ...dzis, slowo };
+      return widok();
+    },
+    async stanUwaga(uwaga: Uwaga) {
+      await czekaj(150);
+      if (!dzis) throw new BladApi("brak_wpisu", 409, KOMUNIKATY.brak_wpisu);
+      const bylHiper = dzis.uwaga === "hyperfocus" && uwaga !== "hyperfocus";
+      dzis = { ...dzis, uwaga };
+      const tekst = { hypofocus: "Uwaga: rozproszony. Dziś jedno na raz.", normal: "Uwaga: w normie.",
+                      hyperfocus: "Uwaga: hiperfokus. Nie przerywam; co 90 minut przypomnę o przerwie i wodzie." }[uwaga];
+      return widok({ komunikat: bylHiper ? `${tekst}\n\nWitaj z powrotem. Resztę planu dnia sprawdzimy, gdy będziesz gotowy.` : tekst });
+    },
+  };
+}
+
 function sztuczne(): Api {
+  const stan = sztucznyStan();
   let numer = 7;
   let ostatnia: { id: string; typ: string; krok?: string; werdykt?: Werdykt } | null = null;
   return {
+    ...stan,
     async hub() {
       await czekaj(250);
       return {

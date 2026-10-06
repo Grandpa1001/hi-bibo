@@ -51,7 +51,7 @@ class BotApi:
             raise BladTelegrama(f"{metoda}: {odp.get('error_code')} {odp.get('description')}", odp.get("error_code"))
         return odp["result"]
 
-    async def ustaw_menu(self, url: str, tekst: str = "🎲 Tryby") -> None:
+    async def ustaw_menu(self, url: str, tekst: str = "Bibo") -> None:
         """Przycisk menu dla wszystkich czatów prywatnych bota."""
         await self.wywolaj("setChatMenuButton", {
             "menu_button": {"type": "web_app", "text": tekst, "web_app": {"url": url}}})

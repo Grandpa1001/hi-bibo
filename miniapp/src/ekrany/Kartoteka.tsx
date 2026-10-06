@@ -1,32 +1,25 @@
 import { useEffect, useState } from "preact/hooks";
 import { api, BladApi, type Kartoteka as K } from "../api";
-import { idz, nowaSprawa } from "../stan";
-import { Czekanie, Dymek, Postac, usePrzyciski } from "../ui/ui";
+import { Dymek } from "../ui/ui";
 
 const OBROT = ["-2deg", "1.5deg", "1deg", "-1.5deg", "-1deg", "2deg"];
 
-export function Kartoteka() {
+/** Treść podzakładki „Kartoteka” w Bibotektywie. Przyciski natywne deklaruje strona gry (ekran-liść). */
+export function KartotekaTresc() {
   const [k, setK] = useState<K | null>(null);
   const [blad, setBlad] = useState<string | null>(null);
   useEffect(() => {
     api.kartoteka().then(setK).catch((e) => setBlad(e instanceof BladApi ? e.message : "Nie udało się otworzyć kartoteki."));
   }, []);
-  usePrzyciski({ tekst: "🕵️ Nowa sprawa", onClick: nowaSprawa }, null, () => idz("start"));
 
   if (blad) return <div class="ekran"><Dymek poza="mysli" etykieta="Kartoteka"><p>{blad}</p></Dymek></div>;
-  if (!k) return <Czekanie poza="detektyw" tekst="Otwieram kartotekę" podpis="Podejrzani i sprawy" />;
+  if (!k) return <p class="ladowanie" aria-live="polite"><span class="kropki" aria-hidden="true"><i /><i /><i /></span> Otwieram kartotekę</p>;
 
   const lista = [...k.podejrzani].sort((a, b) => b.zatrzymania - a.zatrzymania);
   const lider = lista[0];
   return (
     <div class="ekran">
-      <div class="kartoteka-naglowek">
-        <div>
-          <h1>Kartoteka</h1>
-          <p>{lider ? <>Najczęściej wracający podejrzany: {lider.emoji} {lider.nazwa}.</> : "Jeszcze pusto. Pierwsza sprawa czeka."}</p>
-        </div>
-        <Postac poza="detektyw" />
-      </div>
+      <p class="podpowiedz-tekst">{lider ? <>Najczęściej wracający podejrzany: {lider.emoji} {lider.nazwa}.</> : "Jeszcze pusto. Pierwsza sprawa czeka."}</p>
       {lista.length > 0 && (
         <>
           <div class="tablica">

@@ -208,7 +208,7 @@ def doprecyzuj(w: str, *, slowo: str | None = None, notatka: str | None = None,
 
 def ustaw_uwage(w: str, uwaga: str, *, zrodlo: str = "manual", teraz: datetime | None = None,
                 sciezka: Path | None = None) -> dict:
-    """FR-11 `/fokus`: nowy wpis z osiami ostatniego wpisu z dziś (tryb dnia bez zmian, zostaje pora zmiany).
+    """FR-11 `/fokus`: nowy wpis z osiami, słowem i notatką ostatniego wpisu z dziś (tryb dnia bez zmian, zostaje pora zmiany).
     Bez dzisiejszego wpisu nie ma osi do skopiowania → `brak_wpisu` (Bibo zaczyna od siatki)."""
     w = _wymagaj_wlasciciela(w)
     _wybor("uwaga", uwaga, UWAGA)
@@ -221,9 +221,9 @@ def ustaw_uwage(w: str, uwaga: str, *, zrodlo: str = "manual", teraz: datetime |
             if not r:
                 raise BladStanu("brak_wpisu", "Najpierw wpis na siatce — bez niego nie ma trybu dnia.")
             wid = "w_" + secrets.token_hex(6)
-            db.execute("INSERT INTO wpisy_stanu (id, wlasciciel, utworzono, energia, przyjemnosc, cwiartka, uwaga, zrodlo) "
-                       "VALUES (?,?,?,?,?,?,?,?)",
-                       (wid, w, _utc(teraz), r["energia"], r["przyjemnosc"], r["cwiartka"], uwaga, zrodlo))
+            db.execute("INSERT INTO wpisy_stanu (id, wlasciciel, utworzono, energia, przyjemnosc, cwiartka, uwaga, slowo, notatka, zrodlo) "
+                       "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                       (wid, w, _utc(teraz), r["energia"], r["przyjemnosc"], r["cwiartka"], uwaga, r["slowo"], r["notatka"], zrodlo))
             db.execute("COMMIT")
         except BaseException:
             db.execute("ROLLBACK")

@@ -37,7 +37,7 @@ async def wyslij_propozycje(uid: str, uslugi) -> bool:
         return False
     tekst = "🕵️ Brzmi jak klasyczny zator. Otwieramy śledztwo?"
     try:
-        await uslugi.bot.wiadomosc_z_aplikacja(uid, tekst, "🔍 Otwieramy", uslugi.url)
+        await uslugi.bot.wiadomosc_z_aplikacja(uid, tekst, "🔍 Otwieramy", f"{uslugi.url}/#/gry/detektyw")
     except BladTelegrama as e:
         log.warning("bibo-tryby: propozycja nie wysłana: %s", e)
         return False

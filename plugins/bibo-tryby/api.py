@@ -46,6 +46,8 @@ def trasy(app: web.Application) -> None:
     app.router.add_post("/api/sprawa/{id}/zamknij", api_zamknij)
     app.router.add_post("/api/sprawa/{id}/kontrola", api_kontrola)
     app.router.add_get("/api/kartoteka", api_kartoteka)
+    from . import api_stan
+    api_stan.trasy(app)
     app.router.add_get("/{sciezka:(?!api/).*}", front)
 
 
@@ -71,6 +73,8 @@ KOMUNIKATY = {
     "sprawa": "Nie znaleziono tej sprawy. Może przedawniła się (30 min bez zamknięcia).",
     "stan": "Ta sprawa jest w innym etapie — otwórz ją od początku.",
     "dane": "Coś się nie zgadza w danych. Spróbuj ponownie.",
+    "wylaczone": "Ta funkcja jest wyłączona w ustawieniach tej instancji.",
+    "brak_wpisu": "Najpierw wpis na siatce — bez niego nie ma trybu dnia.",
     "limit": "Za dużo zapytań w tej godzinie — spróbuj później.",
     "model": "Nie udało się teraz dokończyć. Możesz spróbować jeszcze raz albo wyjść — nic się nie zapisało.",
 }

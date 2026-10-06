@@ -42,7 +42,7 @@ class Propozycja(unittest.IsolatedAsyncioTestCase):
         u.bot.wiadomosc_z_aplikacja.assert_awaited_once()
         args, kwargs = u.bot.wiadomosc_z_aplikacja.await_args
         self.assertEqual(args[0], "42")           # uid
-        self.assertEqual(args[3], u.url)          # url
+        self.assertEqual(args[3], f"{u.url}/#/gry/detektyw")   # prosto na stronę gry, nie na zakładkę „Dziś”
         kart = magazyn.kartoteka()
         self.assertEqual(kart["propozycje"][magazyn.data()], 1)
 

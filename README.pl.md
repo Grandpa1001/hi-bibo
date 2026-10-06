@@ -74,10 +74,12 @@ hermes dashboard
 Na serwerze: `ssh -L 9119:127.0.0.1:9119 twój-serwer`, tam `hermes dashboard --no-open`,
 a u siebie otwórz http://127.0.0.1:9119.
 
-## Tryby / Mini App (Bibotektyw)
+## Mini App Bibo (stan dnia i gry)
 
-Opcjonalna wtyczka `bibo-tryby` dokłada do czatu przycisk „🎲 Tryby” obok
-pola wiadomości. Otwiera Mini App z grą **Bibotektyw**: bierzesz wymówkę,
+Opcjonalna wtyczka `bibo-tryby` dokłada do czatu przycisk „Bibo” obok
+pola wiadomości. Otwiera Mini App z dwiema zakładkami: **Dziś** (stan dnia:
+widget z trybem, stanem uwagi i 7 ostatnimi dniami, opis w
+[docs/STAN.md](docs/STAN.md)) i **Gry**. Pierwsza gra to **Bibotektyw**: bierzesz wymówkę,
 z której odkładasz zadanie, Bibo-detektyw przesłuchuje ją jak podejrzanego
 i wydaje werdykt („obalona” / „częściowo” / „uniewinniona”) plus jeden mały
 krok. Po zamknięciu akt Bibo pisze do Ciebie w czacie i po 10 min sprawdza,

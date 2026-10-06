@@ -62,15 +62,23 @@ class Klawiatura(Baza):
             self.assertTrue(siatka.rozpoznaj(t), t)
 
 
+class Normalizacja(Baza):
+    def test_selektor_wariantu_emoji_nie_psuje_rozpoznania(self):
+        self.assertTrue(siatka.rozpoznaj("⚡️⚡️ 😄"))   # U+FE0F doklejony przez klienta
+        self.assertIn("Zapisane", self.o("⚡️⚡️ 😄")["text"])
+        self.assertEqual(stan.dzisiejszy(W, teraz=TERAZ, sciezka=self.db)["cwiartka"], "peak")
+        self.assertIn("zostawiam", self.o("⏩️ Pomiń")["text"])
+
+
 class Przeplyw(Baza):
     def test_tap_zapisuje_i_prosi_o_slowo_z_cwiartki(self):
         odp = self.o(POLE_SZCZYT)
         self.assertIn("Szczyt", odp["text"])
         przyciski = [b["text"] for r in odp["reply_markup"]["keyboard"] for b in r]
         self.assertEqual(przyciski, ["💭 " + s for s in stan.SLOWA["peak"]] + [siatka.PRZYCISK_POMIN]
-                         + ["🌫 Rozproszony", "👌 W normie", "🎯 Hiperfokus"])
+                         + ["🌀 Rozproszony", "👌 W normie", "🎯 Hiperfokus"])
         self.assertEqual([b["text"] for b in odp["reply_markup"]["keyboard"][-1]],
-                         ["🌫 Rozproszony", "👌 W normie", "🎯 Hiperfokus"])   # FR-11: jeden rząd trzech przycisków
+                         ["🌀 Rozproszony", "👌 W normie", "🎯 Hiperfokus"])   # FR-11: jeden rząd trzech przycisków
         self.assertEqual(stan.dzisiejszy(W, teraz=TERAZ, sciezka=self.db)["cwiartka"], "peak")
 
     def test_slowo_pomin_i_notatka(self):

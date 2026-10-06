@@ -120,6 +120,12 @@ class Uwaga(Baza):
         d = stan.dzisiejszy(W, teraz=TERAZ + timedelta(hours=2), sciezka=self.db)
         self.assertEqual((d["cwiartka"], d["uwaga"]), ("recovery", "hyperfocus"))
 
+    def test_zmiana_uwagi_zachowuje_slowo_i_notatke(self):
+        self.wpis(2, 2)
+        stan.doprecyzuj(W, slowo="skupiony", notatka="dobry start", teraz=TERAZ, sciezka=self.db)
+        b = stan.ustaw_uwage(W, "hyperfocus", teraz=TERAZ + timedelta(hours=1), sciezka=self.db)
+        self.assertEqual((b["slowo"], b["notatka"]), ("skupiony", "dobry start"))
+
     def test_bez_wpisu_z_dzis_brak_osi(self):
         with self.assertRaises(stan.BladStanu) as e:
             stan.ustaw_uwage(W, "hypofocus", teraz=TERAZ, sciezka=self.db)

@@ -33,7 +33,7 @@ export function Kontrola({ id }: { id: string }) {
   usePrzyciski(
     gotowe ? { tekst: "✅ Ruszyło", onClick: () => odpowiedz(true), postep: wysylam } : null,
     gotowe ? { tekst: "🐢 Jeszcze nie", onClick: () => odpowiedz(false), wylaczony: wysylam } : null,
-    blad ? () => idz("start") : null,
+    blad ? () => idz("dzis") : null,
   );
 
   if (blad) return <div class="ekran"><Dymek poza="mysli" etykieta="Kontrola"><p>{blad}</p></Dymek></div>;
