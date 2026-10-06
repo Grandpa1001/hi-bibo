@@ -17,6 +17,14 @@ from . import magazyn
 
 log = logging.getLogger("bibo-tryby")
 
+ZNACZNIK_SYSTEMOWY = "[bibo-tryby ·"   # każda notatka wstrzykiwana przez wtyczkę zaczyna się od tego znacznika
+
+
+def wewnetrzna(tekst) -> bool:
+    """Czy to wiadomość wstrzyknięta przez wtyczkę (kontrola, check-in, komentarz), a nie od usera. Nie liczymy jej do aktywności."""
+    return isinstance(tekst, str) and tekst.lstrip().startswith(ZNACZNIK_SYSTEMOWY)
+
+
 _zrodla: dict[str, object] = {}
 _blokada = threading.Lock()
 

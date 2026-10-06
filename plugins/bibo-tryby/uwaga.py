@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from . import karta, kontakt, siatka, stan, tryb
+from . import karta, kontakt, kryzys, siatka, stan, tryb
 
 log = logging.getLogger("bibo-tryby")
 
@@ -65,7 +65,7 @@ def wybierz(w: str, uwaga: str, *, teraz: datetime | None = None, sciezka: Path 
 async def sprawdz(uslugi, teraz: datetime | None = None, sciezka: Path | None = None) -> int:
     """Wywoływane przez pętlę kontroli. Zwraca liczbę wysłanych przypomnień (0 lub 1)."""
     w = karta.wlasciciel()
-    if not w or not siatka.wlaczone() or not getattr(uslugi, "bot", None):
+    if not w or not siatka.wlaczone() or not getattr(uslugi, "bot", None) or kryzys.aktywny(w):
         return 0
     teraz = teraz or kontakt.teraz()
     if not stan.zajmij_przypomnienie(w, wstrzymane=bool(kontakt.powod_blokady(teraz)), teraz=teraz, sciezka=sciezka):

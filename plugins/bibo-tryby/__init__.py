@@ -2,11 +2,13 @@
 
 Wtyczka dotyka Bibo w trzech miejscach, wszystkie opcjonalne:
 - `pre_gateway_dispatch` — zapamiętuje źródło rozmowy; jedyne, co przechwytuje, to
-  stuknięcia w siatkę stanu dnia właściciela (`siatka.py`, bez udziału modelu),
+  stuknięcia w siatkę stanu dnia właściciela (`siatka.py`, bez udziału modelu); treści kryzysowe
+  tylko uruchamiają numery pomocy (`kryzys.py`), a wiadomość dalej idzie do Bibo,
 - `pre_llm_call` — dokleja zaległą notatkę z Mini App (fallback) i krótkie
   podsumowanie karty bieżącej sprawy oraz tryb dnia (`tryb.py`; przy okazji liczy turę
   do zaangażowania, same czasy bez treści),
-- `post_llm_call` — raz dziennie, po pierwszej turze, pokazuje siatkę stanu dnia;
+- `post_llm_call` — raz dziennie, po pierwszej turze, pokazuje siatkę stanu dnia (po przerwie
+  oszacowanie); zbiera sygnały gorszego dnia i uwagi i zadaje najwyżej jedno pytanie Tak/Nie;
   wykrywa znacznik propozycji `[[tryb:detektyw]]`
   (znacznik z tekstu usuwa `bibo-podpis`; `transform_llm_output` bierze tylko
   pierwszą podmianę, więc nie konkurujemy z podpisem).
@@ -18,7 +20,7 @@ from __future__ import annotations
 
 import logging
 
-from . import czat, gateway_most, karta, karta_narzedzie, kontakt, siatka, stan, tryb, uslugi, uwaga
+from . import czat, gateway_most, karta, karta_narzedzie, kontakt, kryzys, siatka, stan, sygnaly, tryb, uslugi, uwaga
 
 log = logging.getLogger("bibo-tryby")
 ZNACZNIK = "[[tryb:detektyw]]"
@@ -38,6 +40,9 @@ def _na_wiadomosc(event=None, **_):
         if src is not None and platforma == "telegram":
             gateway_most.zapamietaj_zrodlo(src)
             tekst = getattr(event, "text", "") or ""
+            if getattr(src, "chat_type", "dm") == "dm" and not gateway_most.wewnetrzna(tekst) and kryzys.wykryj(tekst):
+                _kryzys(src)   # bezpieczeństwo przed wszystkim; wiadomość nadal trafia do Bibo (z poleceniem w kontekście)
+                return None
             w = _stan_wlasciciela(getattr(src, "user_id", "")) if siatka.rozpoznaj(tekst) else None
             u = uslugi.aktywne()
             if w and u and u.bot and getattr(src, "chat_type", "dm") == "dm":
@@ -50,21 +55,52 @@ def _na_wiadomosc(event=None, **_):
     return None
 
 
-def _pokaz_siatke_gdy_pierwsza_tura(platform: str) -> None:
-    """FR-1: raz dziennie, gdy dziś nie ma wpisu. Dzień już załatwiony pamiętamy w pamięci procesu,
-    więc kolejne tury tego dnia nie dotykają bazy."""
+def _kryzys(src) -> None:
+    """Treści o kryzysie: numery pomocy od razu, a do końca doby żadnego planowania ani pytań o stan."""
+    uid = str(getattr(src, "chat_id", "") or getattr(src, "user_id", ""))
+    kryzys.zanotuj(str(getattr(src, "user_id", "") or uid))
+    u = uslugi.aktywne()
+    if u and u.bot and uid:
+        u.zleć(kryzys.wyslij(uid, u))
+
+
+def _pokaz_siatke_gdy_pierwsza_tura(platform: str) -> bool:
+    """FR-1: raz dziennie, gdy dziś nie ma wpisu (po przerwie ≥ 3 doby zamiast siatki pada oszacowanie, FR-6).
+    Dzień już załatwiony pamiętamy w pamięci procesu, więc kolejne tury tego dnia nie dotykają bazy.
+    Zwraca True, gdy wysłano wiadomość."""
     w = karta.wlasciciel()
-    if platform != "telegram" or not w or not siatka.wlaczone() or gateway_most.ostatni_user() != w:
-        return
+    if platform != "telegram" or not w or not siatka.wlaczone() or gateway_most.ostatni_user() != w or kryzys.aktywny(w):
+        return False
     dzien = kontakt.teraz().astimezone(kontakt.strefa()).date()
     if _siatka_dzien.get(w) == dzien:
-        return
+        return False
     u = uslugi.aktywne()
     if not (u and u.bot):
-        return   # usługi jeszcze wstają: spróbujemy przy następnej turze
+        return False   # usługi jeszcze wstają: spróbujemy przy następnej turze
     _siatka_dzien[w] = dzien
-    if stan.czy_pokazac_siatke(w):
-        u.zleć(siatka.wyslij(w, u))
+    if not stan.czy_pokazac_siatke(w):
+        return False
+    u.zleć(siatka.wyslij(w, u, sygnaly.oszacowanie(w)))   # None → zwykła siatka
+    return True
+
+
+def _sygnaly_po_turze(platform: str, user_message) -> None:
+    """FR-5/12/13 + łagodna sugestia wsparcia. Po turze, więc nie opóźnia odpowiedzi; najwyżej jedna wiadomość."""
+    w = karta.wlasciciel()
+    if platform != "telegram" or not w or not siatka.wlaczone() or gateway_most.ostatni_user() != w or kryzys.aktywny(w):
+        return
+    if not isinstance(user_message, str) or gateway_most.wewnetrzna(user_message):
+        return   # tura wewnętrzna albo nie tekst: to nie jest aktywność usera
+    u = uslugi.aktywne()
+    if not (u and u.bot):
+        return
+    pytanie = sygnaly.po_turze(w, user_message)
+    if pytanie:
+        u.zleć(siatka.wyslij(w, u, pytanie))
+        return
+    tekst = sygnaly.sugestia_wsparcia(w)
+    if tekst:
+        u.zleć(siatka.wyslij(w, u, {"text": tekst, "reply_markup": {"remove_keyboard": True}}))
 
 
 def _komenda_stan(raw_args: str = "") -> str | None:
@@ -79,12 +115,15 @@ def _komenda_stan(raw_args: str = "") -> str | None:
     return None
 
 
-def _tryb_dnia(sender_id: str) -> str | None:
-    """FR-3/FR-10: zlicza turę (czasy, bez treści) i zwraca wytyczne trybu dnia — jedno połączenie z bazą."""
+def _tryb_dnia(sender_id: str, user_message=None) -> str | None:
+    """FR-3/FR-10: zlicza turę (czasy, bez treści) i zwraca wytyczne trybu dnia — jedno połączenie z bazą.
+    Tury wewnętrzne (notatki wtyczki) nie liczą się do aktywności; w dobie kryzysu wytyczne trybu nie wychodzą."""
     w = _stan_wlasciciela(sender_id)
-    if not w:
+    if not w or kryzys.aktywny(w):
         return None
     try:
+        if gateway_most.wewnetrzna(user_message):
+            return tryb.kontekst(stan.dzisiejszy(w))
         return tryb.kontekst(stan.rejestruj_ture(w))
     except Exception:
         log.debug("bibo-tryby: tryb dnia", exc_info=True)
@@ -122,10 +161,11 @@ def _komenda_fokus(raw_args: str = "") -> str | None:
     return None
 
 
-def _przed_tura(platform: str = "", sender_id: str = "", **_):
+def _przed_tura(platform: str = "", sender_id: str = "", user_message=None, **_):
     try:
         if platform == "telegram":
-            czesci = [gateway_most.odbierz_notatki(), karta_narzedzie.podsumowanie(sender_id), _tryb_dnia(sender_id)]
+            czesci = [kryzys.kontekst(sender_id), gateway_most.odbierz_notatki(), karta_narzedzie.podsumowanie(sender_id),
+                      _tryb_dnia(sender_id, user_message)]
             czesci = [c for c in czesci if c]
             if czesci:
                 return {"context": "\n\n".join(czesci)}
@@ -134,11 +174,12 @@ def _przed_tura(platform: str = "", sender_id: str = "", **_):
     return None
 
 
-def _po_turze(assistant_response: str = "", platform: str = "", **_):
+def _po_turze(assistant_response: str = "", platform: str = "", user_message=None, **_):
     try:
-        _pokaz_siatke_gdy_pierwsza_tura(platform)
+        if not _pokaz_siatke_gdy_pierwsza_tura(platform):
+            _sygnaly_po_turze(platform, user_message)
     except Exception:
-        log.debug("bibo-tryby: siatka po turze", exc_info=True)
+        log.debug("bibo-tryby: siatka i sygnały po turze", exc_info=True)
     try:
         if platform != "telegram" or ZNACZNIK not in (assistant_response or ""):
             return

@@ -46,6 +46,37 @@ Przypomnienia wysyła kod (bez modelu) w istniejącej pętli co 60 s i respektuj
 przepada, nie wychodzi po jej końcu. Po wyjściu z hiperfokusu Bibo w jednej wiadomości mówi, co ma zapisane (zakończone sprawy dziś)
 i co czeka w karcie. Planu dnia spoza karty ta instancja nie ma, więc go nie zgaduje.
 
+## Wykrywanie gorszego dnia i uwagi
+
+Bibo sam zauważa sygnały, ale **niczego nie zmienia bez Twojego „Tak”**. Zbiera je prostymi regułami w kodzie
+(bez modelu i bez zapisu treści; zapisuje tylko rodzaj sygnału i długość wiadomości):
+
+| Pytanie | Sygnały (suma wag ≥ 2) |
+| --- | --- |
+| „Gorszy dzień?” | wyraźna fraza typu „nie mam siły” (sama wystarcza) · pisanie po 23:00 · wiadomości wyraźnie krótsze niż zwykle |
+| „Jesteś w hiperfokusie?” | rozmowa z Bibo ciągnąca się ponad 3 h bez przerwy (sama wystarcza) · pora po 23:00 |
+| „Rozproszony dzień?” | co najmniej 4 krótkie sesje dziś (średnio poniżej 10 min) **i** co najmniej 2 odłożone dziś karty |
+
+Pytanie pada po turze, z przyciskami ✅ Tak / ❌ Nie. Najwyżej raz dziennie o dany cel, najwyżej dwa pytania dziennie, jedno
+naraz. O uwagę nie pytamy bez dzisiejszego wpisu. „Tak” na gorszy dzień obniża tylko przyjemność (energia zostaje, jak ją
+zadeklarowałeś); „Nie” niczego nie zmienia i trafia tylko do licznika fałszywych alarmów.
+Bibo widzi tylko czas w rozmowie z nim i swoje karty, więc „długa sesja” i „porzucone zadania” to przybliżenia.
+
+**Po przerwie.** Po 2 pominiętych dniach (ostatni wpis 3 doby temu) pierwsza rozmowa dnia zaczyna się jednym pytaniem
+z oszacowaniem Bibo (najczęstszy tryb z ostatniego tygodnia) zamiast siatki. „Tak” zapisuje wpis ze źródłem
+`inferred_confirmed`, „Nie” pokazuje siatkę. Raz na przerwę, bez przypomnień.
+
+**Wsparcie.** Po 5 dniach z rzędu w Regeneracji albo przy 3 potwierdzonych gorszych dniach w tygodniu Bibo raz (najwyżej co
+14 dni) łagodnie podpowiada rozmowę z bliską osobą lub specjalistą. Bez diagnozy.
+
+## Kryzys
+
+Gdy napiszesz o myślach samobójczych albo samookaleczeniu, Bibo od razu wysyła numery pomocy (**116 123**, Kryzysowy
+Telefon Zaufania, i **112** w bezpośrednim zagrożeniu) i przerywa planowanie: do końca doby nie ma siatki, pytań o stan
+ani przypomnień, a Bibo odpowiada krótko i ciepło. Działa to w kodzie, także gdy `stan` jest wyłączony. Treść tych
+wiadomości nie jest nigdzie zapisywana. Wzorce są szerokie celowo: lepiej raz niepotrzebnie podać numer niż przeoczyć
+prawdziwy kryzys.
+
 ## Zaangażowanie w tle
 
 Zaangażowania nie pytamy. Bibo zapisuje wyłącznie znaczniki czasu tur (liczba tur, sesje przedzielone przerwą

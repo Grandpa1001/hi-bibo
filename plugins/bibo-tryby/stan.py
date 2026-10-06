@@ -73,6 +73,26 @@ CREATE TABLE IF NOT EXISTS siatka_pokazana (
     dzien TEXT NOT NULL,
     PRIMARY KEY (wlasciciel, dzien)
 );
+CREATE TABLE IF NOT EXISTS wiadomosci_dl (
+    wlasciciel TEXT NOT NULL,
+    utworzono TEXT NOT NULL,
+    dl INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS wiadomosci_dl_czas ON wiadomosci_dl (wlasciciel, utworzono);
+CREATE TABLE IF NOT EXISTS oszacowania (
+    wlasciciel TEXT NOT NULL,
+    dzien TEXT NOT NULL,
+    cwiartka TEXT NOT NULL,
+    energia INTEGER NOT NULL,
+    przyjemnosc INTEGER NOT NULL,
+    odpowiedz INTEGER,
+    PRIMARY KEY (wlasciciel, dzien)
+);
+CREATE TABLE IF NOT EXISTS wsparcie (
+    wlasciciel TEXT NOT NULL,
+    dzien TEXT NOT NULL,
+    PRIMARY KEY (wlasciciel, dzien)
+);
 CREATE TABLE IF NOT EXISTS przypomnienia_uwagi (
     wlasciciel TEXT NOT NULL,
     dzien TEXT NOT NULL,
@@ -95,6 +115,8 @@ _gotowe: set[str] = set()   # bazy ze świeżo sprawdzonym schematem: nie powtar
 DNI_POKAZU = 14
 PRZERWA_SESJI_MIN = 30       # dłuższa przerwa między turami zaczyna nową sesję
 DNI_AKTYWNOSCI = 60
+DNI_DLUGOSCI = 30
+DNI_BAZY_DLUGOSCI = 14
 PRZYPOMNIENIE_CO_MIN = 90      # FR-14: w hiperfokusie najwyżej jedno przypomnienie na 90 min
 MAKS_PRZYPOMNIEN = 6           # dziennie; twardy bezpiecznik, żeby nie zasypać
 
@@ -374,6 +396,102 @@ def zajmij_przypomnienie(w: str, *, wstrzymane: bool = False, teraz: datetime | 
     return wyslac
 
 
+# --- tempo pisania, sesja, historia (wejście dla sygnałów) ---------------------------------
+
+def zapisz_dlugosc(w: str, dlugosc: int, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict:
+    """Zapisuje samą długość wiadomości (nie treść) i zwraca porównanie z typowym tempem usera:
+    `dzis` = średnia z 3 ostatnich dzisiejszych wiadomości (None, gdy mniej niż 3), `baza` = średnia
+    z poprzednich dni (None, gdy mniej niż 20 wiadomości)."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    od, do = _dzien_utc(teraz)
+    od_bazy, _ = _dzien_utc(teraz, -DNI_BAZY_DLUGOSCI)
+    with closing(_polacz(sciezka)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            db.execute("INSERT INTO wiadomosci_dl (wlasciciel, utworzono, dl) VALUES (?,?,?)", (w, _utc(teraz), int(dlugosc)))
+            db.execute("DELETE FROM wiadomosci_dl WHERE utworzono<?", (_dzien_utc(teraz, -DNI_DLUGOSCI)[0],))
+            ost = [r[0] for r in db.execute("SELECT dl FROM wiadomosci_dl WHERE wlasciciel=? AND utworzono>=? AND utworzono<? "
+                                            "ORDER BY utworzono DESC, rowid DESC LIMIT 3", (w, od, do))]
+            n, suma = db.execute("SELECT COUNT(*), COALESCE(SUM(dl),0) FROM wiadomosci_dl WHERE wlasciciel=? AND utworzono>=? AND utworzono<?",
+                                 (w, od_bazy, od)).fetchone()
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+    return {"dzis": sum(ost) / 3 if len(ost) == 3 else None, "baza": suma / n if n >= 20 else None}
+
+
+def sesja(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict | None:
+    """Dzisiejsza aktywność: początek bieżącej sesji, liczba sesji i łączny czas w sesjach (sekundy)."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    dzien = teraz.astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        r = db.execute("SELECT start_sesji, ostatnia, sesje, sekundy FROM aktywnosc WHERE wlasciciel=? AND dzien=?", (w, dzien)).fetchone()
+    return dict(r) if r else None
+
+
+def dni_bez_wpisu(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> tuple[str | None, int | None]:
+    """(data ostatniego wpisu usera, ile dni temu) — (None, None), gdy nigdy nie było wpisu."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    z = kontakt.strefa()
+    with closing(_polacz(sciezka)) as db:
+        r = db.execute("SELECT utworzono FROM wpisy_stanu WHERE wlasciciel=? ORDER BY utworzono DESC LIMIT 1", (w,)).fetchone()
+    if not r:
+        return None, None
+    d = datetime.fromisoformat(r[0]).astimezone(z).date()
+    return d.isoformat(), (teraz.astimezone(z).date() - d).days
+
+
+def _ostatnie_wpisy_dni(db: sqlite3.Connection, w: str, teraz: datetime, dni: int) -> list[sqlite3.Row]:
+    """Ostatni wpis z każdego z `dni` ostatnich dób (włącznie z dziś), od najstarszego."""
+    z = kontakt.strefa()
+    od, _ = _dzien_utc(teraz, -(dni - 1))
+    po_dniach: dict = {}
+    for r in db.execute("SELECT * FROM wpisy_stanu WHERE wlasciciel=? AND utworzono>=? ORDER BY utworzono, rowid", (w, od)):
+        po_dniach[datetime.fromisoformat(r["utworzono"]).astimezone(z).date()] = r
+    return [po_dniach[d] for d in sorted(po_dniach)]
+
+
+def typowy_stan(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict | None:
+    """FR-6: oszacowanie bez pytania usera — najczęstsza ćwiartka z ostatnich 7 dób z wpisem (remis: nowsza),
+    z osiami najnowszego wpisu w tej ćwiartce. None, gdy w ostatnim tygodniu nie było wpisów."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    with closing(_polacz(sciezka)) as db:
+        wpisy = _ostatnie_wpisy_dni(db, w, teraz, 14)[-7:]
+    if not wpisy:
+        return None
+    licz = {}
+    for r in wpisy:
+        licz[r["cwiartka"]] = licz.get(r["cwiartka"], 0) + 1
+    naj = max(licz.values())
+    for r in reversed(wpisy):   # remis rozstrzyga najnowszy
+        if licz[r["cwiartka"]] == naj:
+            return {"cwiartka": r["cwiartka"], "energia": r["energia"], "przyjemnosc": r["przyjemnosc"]}
+    return None
+
+
+def regeneracja_z_rzedu(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> int:
+    """Ile kolejnych dób (kończąc na dziś albo, bez dzisiejszego wpisu, na wczoraj) ostatni wpis dnia to Regeneracja."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    z = kontakt.strefa()
+    with closing(_polacz(sciezka)) as db:
+        wpisy = _ostatnie_wpisy_dni(db, w, teraz, 30)
+    po_dniach = {datetime.fromisoformat(r["utworzono"]).astimezone(z).date(): r["cwiartka"] for r in wpisy}
+    d = teraz.astimezone(z).date()
+    if d not in po_dniach:
+        d -= timedelta(days=1)
+    n = 0
+    while po_dniach.get(d) == "recovery":
+        n += 1
+        d -= timedelta(days=1)
+    return n
+
+
 # --- sygnały gorszego dnia / uwagi ------------------------------------------------
 
 def zapisz_sygnal(w: str, rodzaj: str, cel: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict:
@@ -413,3 +531,135 @@ def odpowiedz_na_pytanie(w: str, sygnal_id: str, potwierdzone: bool, *, sciezka:
                        (int(bool(potwierdzone)), sygnal_id, w)).rowcount
     if n == 0:
         raise BladStanu("brak_wpisu", "Nie ma zadanego pytania dla tego sygnału.")
+
+
+def sygnaly_dzis(w: str, cel: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> list[dict]:
+    w = _wymagaj_wlasciciela(w)
+    _wybor("cel", cel, CELE)
+    od, do = _dzien_utc(teraz or kontakt.teraz())
+    with closing(_polacz(sciezka)) as db:
+        return [dict(r) for r in db.execute("SELECT * FROM sygnaly_stanu WHERE wlasciciel=? AND cel=? AND utworzono>=? AND utworzono<? "
+                                            "ORDER BY utworzono", (w, cel, od, do))]
+
+
+def zapisz_sygnal_raz_dziennie(w: str, rodzaj: str, cel: str, *, teraz: datetime | None = None,
+                               sciezka: Path | None = None) -> bool:
+    """Ten sam rodzaj sygnału dla tego samego celu liczy się raz na dobę (nie mnożymy dowodów z jednej cechy)."""
+    teraz = teraz or kontakt.teraz()
+    if any(r["rodzaj"] == rodzaj for r in sygnaly_dzis(w, cel, teraz=teraz, sciezka=sciezka)):
+        return False
+    zapisz_sygnal(w, rodzaj, cel, teraz=teraz, sciezka=sciezka)
+    return True
+
+
+def stan_pytan(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict:
+    """Wszystko, czego po turze potrzebuje wykrywanie, w jednym połączeniu z bazą:
+    `sygnaly` (dzisiejsze wiersze), `zapytane` (cele, o które dziś pytano), `oczekuje` (jest pytanie bez odpowiedzi)
+    i `pytan` (liczba dzisiejszych pytań, także oszacowań)."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    od, do = _dzien_utc(teraz)
+    dzien = teraz.astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        wiersze = [dict(r) for r in db.execute("SELECT * FROM sygnaly_stanu WHERE wlasciciel=? AND utworzono>=? AND utworzono<? ORDER BY utworzono",
+                                               (w, od, do))]
+        osz = db.execute("SELECT odpowiedz FROM oszacowania WHERE wlasciciel=? AND dzien=?", (w, dzien)).fetchone()
+    zapytane = {r["cel"] for r in wiersze if r["zapytano"]}
+    return {"sygnaly": wiersze, "zapytane": zapytane,
+            "oczekuje": any(r["zapytano"] and r["potwierdzone"] is None for r in wiersze) or (osz is not None and osz[0] is None),
+            "pytan": len(zapytane) + (1 if osz is not None else 0)}
+
+
+def pytan_dzis(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> int:
+    """Liczba różnych celów, o które dziś już pytano (sygnały) plus dzisiejsze oszacowanie."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    od, do = _dzien_utc(teraz)
+    dzien = teraz.astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        n = db.execute("SELECT COUNT(DISTINCT cel) FROM sygnaly_stanu WHERE wlasciciel=? AND zapytano=1 AND utworzono>=? AND utworzono<?",
+                       (w, od, do)).fetchone()[0]
+        n += db.execute("SELECT COUNT(*) FROM oszacowania WHERE wlasciciel=? AND dzien=?", (w, dzien)).fetchone()[0]
+    return n
+
+
+def oznacz_pytanie_celu(w: str, cel: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> None:
+    """Zaznacza, że o ten cel zapytano (wszystkie dzisiejsze sygnały celu)."""
+    w = _wymagaj_wlasciciela(w)
+    od, do = _dzien_utc(teraz or kontakt.teraz())
+    with closing(_polacz(sciezka)) as db:
+        db.execute("UPDATE sygnaly_stanu SET zapytano=1 WHERE wlasciciel=? AND cel=? AND utworzono>=? AND utworzono<?", (w, cel, od, do))
+
+
+def oczekujace_pytanie(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict | None:
+    """Zadane dziś, a jeszcze nieodpowiedziane pytanie: {"typ": "sygnal", "cel"} albo {"typ": "oszacowanie", ...}."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    od, do = _dzien_utc(teraz)
+    dzien = teraz.astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        r = db.execute("SELECT cel FROM sygnaly_stanu WHERE wlasciciel=? AND zapytano=1 AND potwierdzone IS NULL AND utworzono>=? AND utworzono<? "
+                       "ORDER BY utworzono DESC LIMIT 1", (w, od, do)).fetchone()
+        o = db.execute("SELECT * FROM oszacowania WHERE wlasciciel=? AND dzien=? AND odpowiedz IS NULL", (w, dzien)).fetchone()
+    if o:   # oszacowanie i pytanie o sygnały nie występują razem (jedno pytanie naraz), więc kolejność nie ma znaczenia
+        return {"typ": "oszacowanie", **{k: o[k] for k in ("cwiartka", "energia", "przyjemnosc")}}
+    return {"typ": "sygnal", "cel": r["cel"]} if r else None
+
+
+def odpowiedz_na_cel(w: str, cel: str, potwierdzone: bool, *, teraz: datetime | None = None, sciezka: Path | None = None) -> None:
+    """Zapisuje odpowiedź przy wszystkich dzisiejszych, zadanych i nieodpowiedzianych sygnałach celu."""
+    w = _wymagaj_wlasciciela(w)
+    od, do = _dzien_utc(teraz or kontakt.teraz())
+    with closing(_polacz(sciezka)) as db:
+        db.execute("UPDATE sygnaly_stanu SET potwierdzone=? WHERE wlasciciel=? AND cel=? AND zapytano=1 AND potwierdzone IS NULL "
+                   "AND utworzono>=? AND utworzono<?", (int(bool(potwierdzone)), w, cel, od, do))
+
+
+def zapisz_oszacowanie(w: str, oszacowanie: dict, *, teraz: datetime | None = None, sciezka: Path | None = None) -> bool:
+    """FR-6: najwyżej jedno oszacowanie na dobę. True, gdy zapisano (czyli można zapytać)."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    dzien = teraz.astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        return db.execute("INSERT OR IGNORE INTO oszacowania (wlasciciel, dzien, cwiartka, energia, przyjemnosc) VALUES (?,?,?,?,?)",
+                          (w, dzien, oszacowanie["cwiartka"], oszacowanie["energia"], oszacowanie["przyjemnosc"])).rowcount == 1
+
+
+def czy_byla_propozycja_od(w: str, od_dnia: str | None, *, sciezka: Path | None = None) -> bool:
+    """Czy po wskazanej dacie (ostatnim wpisie) proponowano już oszacowanie — jedna propozycja na przerwę."""
+    w = _wymagaj_wlasciciela(w)
+    with closing(_polacz(sciezka)) as db:
+        return db.execute("SELECT 1 FROM oszacowania WHERE wlasciciel=? AND dzien>? LIMIT 1", (w, od_dnia or "")).fetchone() is not None
+
+
+def odpowiedz_na_oszacowanie(w: str, potwierdzone: bool, *, teraz: datetime | None = None, sciezka: Path | None = None) -> None:
+    w = _wymagaj_wlasciciela(w)
+    dzien = (teraz or kontakt.teraz()).astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        db.execute("UPDATE oszacowania SET odpowiedz=? WHERE wlasciciel=? AND dzien=? AND odpowiedz IS NULL", (int(bool(potwierdzone)), w, dzien))
+
+
+def potwierdzone_zle_dni(w: str, *, teraz: datetime | None = None, dni: int = 7, sciezka: Path | None = None) -> int:
+    """Ile z ostatnich `dni` dób miało potwierdzony przez usera gorszy dzień (odpowiedź „tak” na pytanie)."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    z = kontakt.strefa()
+    od, _ = _dzien_utc(teraz, -(dni - 1))
+    with closing(_polacz(sciezka)) as db:
+        rs = db.execute("SELECT utworzono FROM sygnaly_stanu WHERE wlasciciel=? AND cel='bad_day' AND potwierdzone=1 AND utworzono>=?", (w, od)).fetchall()
+    return len({datetime.fromisoformat(r[0]).astimezone(z).date() for r in rs})
+
+
+def wsparcie_niedawno(w: str, *, teraz: datetime | None = None, dni: int = 14, sciezka: Path | None = None) -> bool:
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    od = (teraz.astimezone(kontakt.strefa()).date() - timedelta(days=dni)).isoformat()
+    with closing(_polacz(sciezka)) as db:
+        return db.execute("SELECT 1 FROM wsparcie WHERE wlasciciel=? AND dzien>=? LIMIT 1", (w, od)).fetchone() is not None
+
+
+def zapisz_wsparcie(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> None:
+    w = _wymagaj_wlasciciela(w)
+    dzien = (teraz or kontakt.teraz()).astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        db.execute("INSERT OR IGNORE INTO wsparcie (wlasciciel, dzien) VALUES (?,?)", (w, dzien))

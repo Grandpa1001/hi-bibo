@@ -16,7 +16,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from . import karta, magazyn, stan, tryb, uwaga
+from . import karta, magazyn, stan, sygnaly, tryb, uwaga
 
 log = logging.getLogger("bibo-tryby")
 
@@ -90,7 +90,7 @@ def _norm(tekst: str | None) -> str:
 def rozpoznaj(tekst: str) -> bool:
     """Szybka bramka bez bazy: czy to w ogóle może być wiadomość z klawiatury stanu."""
     t = _norm(tekst)
-    return t in POLA or t in SLOWA or t in FOKUS or t == PRZYCISK_POMIN or t.lower().startswith(PREFIKS_NOTATKI)
+    return t in POLA or t in SLOWA or t in FOKUS or t in sygnaly.ODPOWIEDZI or t == PRZYCISK_POMIN or t.lower().startswith(PREFIKS_NOTATKI)
 
 
 def obsluz(w: str, tekst: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict | None:
@@ -100,6 +100,8 @@ def obsluz(w: str, tekst: str, *, teraz: datetime | None = None, sciezka: Path |
     try:
         if t in POLA:
             return _po_tapnieciu(w, *POLA[t], teraz, sciezka)
+        if t in sygnaly.ODPOWIEDZI:
+            return sygnaly.odpowiedz(w, t, teraz=teraz, sciezka=sciezka)   # None = brak zadanego pytania → do Bibo
         if t in FOKUS:
             return _odp(uwaga.wybierz(w, FOKUS[t], teraz=teraz, sciezka=sciezka))
         if t == PRZYCISK_POMIN:
