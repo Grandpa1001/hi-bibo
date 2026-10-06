@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 
-from . import czat, gateway_most, karta, karta_narzedzie, kontakt, kryzys, siatka, stan, sygnaly, tryb, uslugi, uwaga
+from . import czat, gateway_most, karta, karta_narzedzie, kontakt, kryzys, podsumowanie, prywatnosc, siatka, stan, sygnaly, tryb, uslugi, uwaga
 
 log = logging.getLogger("bibo-tryby")
 ZNACZNIK = "[[tryb:detektyw]]"
@@ -48,7 +48,9 @@ def _na_wiadomosc(event=None, **_):
             if w and u and u.bot and getattr(src, "chat_type", "dm") == "dm":
                 odp = siatka.obsluz(w, tekst)
                 if odp:
-                    u.zleć(siatka.wyslij(w, u, odp))
+                    # wpis z siatki to naturalny moment na podsumowanie tygodnia; bez zmiany klawiatury słów i uwagi
+                    tydzien = _podsumowanie_tekst(w) if tekst.strip() in siatka.POLA else None
+                    u.zleć(_kolejno(siatka.wyslij(w, u, odp), *([siatka.wyslij(w, u, {"text": tydzien})] if tydzien else [])))
                     return {"action": "skip", "reason": "bibo-stan: obsłużone przez siatkę"}
     except Exception:
         log.debug("bibo-tryby: pre_gateway_dispatch", exc_info=True)
@@ -84,6 +86,25 @@ def _pokaz_siatke_gdy_pierwsza_tura(platform: str) -> bool:
     return True
 
 
+_podsumowanie_dzien: dict[str, object] = {}
+
+
+def _podsumowanie_tekst(w: str) -> str | None:
+    """Raz w tygodniu ISO, przy pierwszej okazji (po wpisie z siatki albo po zwykłej turze): tekst do wysłania albo None.
+    Okno kończy się wczoraj, więc wynik się nie zmienia w ciągu doby: sprawdzamy najwyżej raz dziennie."""
+    dzien = kontakt.teraz().astimezone(kontakt.strefa()).date()
+    if _podsumowanie_dzien.get(w) == dzien or kryzys.aktywny(w):
+        return None
+    _podsumowanie_dzien[w] = dzien
+    return podsumowanie.do_wyslania(w)
+
+
+async def _kolejno(*korutyny) -> None:
+    """Wiadomości wychodzą po kolei (osobne zadania mogłyby się zamienić miejscami)."""
+    for k in korutyny:
+        await k
+
+
 def _sygnaly_po_turze(platform: str, user_message) -> None:
     """FR-5/12/13 + łagodna sugestia wsparcia. Po turze, więc nie opóźnia odpowiedzi; najwyżej jedna wiadomość."""
     w = karta.wlasciciel()
@@ -99,6 +120,10 @@ def _sygnaly_po_turze(platform: str, user_message) -> None:
         u.zleć(siatka.wyslij(w, u, pytanie))
         return
     tekst = sygnaly.sugestia_wsparcia(w)
+    if tekst:
+        u.zleć(siatka.wyslij(w, u, {"text": tekst, "reply_markup": {"remove_keyboard": True}}))
+        return
+    tekst = _podsumowanie_tekst(w)
     if tekst:
         u.zleć(siatka.wyslij(w, u, {"text": tekst, "reply_markup": {"remove_keyboard": True}}))
 
@@ -128,6 +153,43 @@ def _tryb_dnia(sender_id: str, user_message=None) -> str | None:
     except Exception:
         log.debug("bibo-tryby: tryb dnia", exc_info=True)
         return None
+
+
+def _komenda_tydzien(raw_args: str = "") -> str | None:
+    """`/tydzien`: podsumowanie ostatnich 7 dni (z dzisiejszym) na żądanie, bez zapisu do Kroniki."""
+    w = karta.wlasciciel()
+    if not w or not siatka.wlaczone():
+        return "Stan dnia jest niedostępny w tej instancji."
+    try:
+        p = podsumowanie.zbuduj(w)
+    except Exception:
+        log.warning("bibo-tryby: /tydzien", exc_info=True)
+        return "Nie udało się teraz policzyć podsumowania."
+    return podsumowanie.tekst(p) if p else "Jeszcze za mało wpisów na podsumowanie — potrzebne są co najmniej 2 dni z wpisem w ostatnim tygodniu."
+
+
+def _komenda_eksport(raw_args: str = "") -> str | None:
+    """Eksport wszystkich danych stanu do pliku JSON w czacie."""
+    w = karta.wlasciciel()
+    u = uslugi.aktywne()
+    if not w:
+        return "Eksport jest niedostępny (brak jednego właściciela profilu)."
+    if not (u and u.bot):
+        return "Teraz nie mogę wysłać pliku — spróbuj za chwilę."
+    u.zleć(prywatnosc.wyslij_eksport(w, u))
+    return None
+
+
+def _komenda_usun(raw_args: str = "") -> str | None:
+    """Usunięcie wszystkich danych stanu: bez argumentu pyta, z `potwierdzam` kasuje."""
+    w = karta.wlasciciel()
+    if not w:
+        return "Usuwanie jest niedostępne (brak jednego właściciela profilu)."
+    odp = prywatnosc.usun(w, raw_args)
+    if (raw_args or "").strip().lower() == prywatnosc.POTWIERDZENIE and odp.startswith("Usunięto"):
+        _siatka_dzien.pop(w, None)
+        _podsumowanie_dzien.pop(w, None)
+    return odp
 
 
 def _komenda_fokus(raw_args: str = "") -> str | None:
@@ -219,6 +281,10 @@ def register(ctx):
     ctx.register_hook("pre_llm_call", _przed_tura)
     ctx.register_hook("post_llm_call", _po_turze)
     ctx.register_command("stan", _komenda_stan, description="Bibo: jak się dziś czujesz (siatka stanu)")
+    ctx.register_command("tydzien", _komenda_tydzien, description="Bibo: podsumowanie tygodnia (tryby i uwaga)")
+    ctx.register_command("stan_eksport", _komenda_eksport, description="Bibo: eksport danych stanu dnia (plik JSON)")
+    ctx.register_command("stan_usun", _komenda_usun, description="Bibo: usuń wszystkie dane stanu dnia (wymaga potwierdzenia)",
+                         args_hint="[potwierdzam]")
     ctx.register_command("fokus", _komenda_fokus, description="Bibo: stan uwagi (rozproszony / norma / hiperfokus)",
                          args_hint="[rozproszony|norma|hiperfokus]")
     ctx.register_command("bt_diag", _komenda_diagnostyka, description="Bibotektyw: diagnostyka wtyczki")

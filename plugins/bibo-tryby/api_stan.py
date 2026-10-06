@@ -10,7 +10,7 @@ import logging
 
 from aiohttp import web
 
-from . import karta, siatka, stan, tryb, uwaga
+from . import karta, podsumowanie, siatka, stan, tryb, uwaga
 from .api import BladApi, _cialo, _uid
 
 log = logging.getLogger("bibo-tryby")
@@ -49,11 +49,21 @@ def _widok(w: str, **dodatek) -> dict:
     return {"wlaczone": True, "dzis": _dzis(w), "tydzien": stan.tydzien(w), **dodatek}
 
 
+def _tydzien(w: str) -> dict | None:
+    """Podsumowanie ostatnich 7 dni do karty „Twój tydzień” (bez domknięć; None, gdy za mało wpisów lub błąd)."""
+    try:
+        p = podsumowanie.zbuduj(w)
+    except Exception:
+        log.debug("bibo-tryby: podsumowanie w API", exc_info=True)
+        return None
+    return {k: p[k] for k in ("od", "do", "dni_z_wpisem", "dni_bez_wpisu", "tryby", "uwaga", "wniosek_trybow", "wniosek_uwagi")} if p else None
+
+
 async def api_stan(request: web.Request) -> web.Response:
     uid = _uid(request)
     if karta.wlasciciel() != uid or not siatka.wlaczone():
         return web.json_response({"wlaczone": False})   # widget po prostu się nie pokazuje
-    return web.json_response(_widok(uid))
+    return web.json_response(_widok(uid, podsumowanie=_tydzien(uid)))
 
 
 async def api_wpis(request: web.Request) -> web.Response:

@@ -304,3 +304,17 @@ blockquote { margin: 12px 0 0; padding: 8px 12px; border-left: 4px solid var(--t
 .chip:hover { background: var(--turkus-50); }
 .chip.wybrany { background: var(--czern); color: var(--biel); }
 .chip:disabled, .segment:disabled { opacity: .7; }
+
+/* podsumowanie tygodnia */
+.tydzien-karta { display: grid; gap: 10px; background: var(--biel); border: var(--kreska); border-radius: 18px; padding: 16px; }
+.tydzien-daty { font: 700 12px/1 var(--mono); color: var(--przygaszony); }
+.rozklad { display: flex; gap: 3px; height: 16px; }
+.rozklad i { flex: 1 1 0; min-width: 8px; background: var(--c); border: 2px solid var(--czern); border-radius: 6px; }
+.legenda-trybow, .chipy-uwagi { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; }
+.legenda-trybow li { display: flex; align-items: center; gap: 6px; }
+.legenda-trybow li i { width: 12px; height: 12px; border-radius: 4px; background: var(--c); border: 1.5px solid var(--czern); }
+.legenda-trybow li.brak i { background: transparent; border: 1.5px dashed var(--szary-3); }
+.legenda-trybow b, .chipy-uwagi b { font-variant-numeric: tabular-nums; }
+.chipy-uwagi li { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1.5px solid var(--czern); border-radius: 999px; background: var(--szary); }
+.tydzien-podtytul { margin: 4px 0 0; font: 700 11px/1.2 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--przygaszony); }
+.wniosek { font-size: 14.5px; line-height: 1.4; padding: 8px 10px; border-radius: 10px; background: var(--turkus-50); }

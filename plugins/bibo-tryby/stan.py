@@ -22,8 +22,9 @@ from __future__ import annotations
 import re
 import secrets
 import sqlite3
+import time
 from contextlib import closing
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import karta, kontakt, magazyn
@@ -93,6 +94,20 @@ CREATE TABLE IF NOT EXISTS wsparcie (
     dzien TEXT NOT NULL,
     PRIMARY KEY (wlasciciel, dzien)
 );
+CREATE TABLE IF NOT EXISTS podsumowania (
+    wlasciciel TEXT NOT NULL,
+    tydzien TEXT NOT NULL,
+    PRIMARY KEY (wlasciciel, tydzien)
+);
+CREATE TABLE IF NOT EXISTS kronika (
+    id TEXT PRIMARY KEY,
+    wlasciciel TEXT NOT NULL,
+    utworzono TEXT NOT NULL,
+    rodzaj TEXT NOT NULL,
+    tekst TEXT NOT NULL,
+    dane TEXT
+);
+CREATE INDEX IF NOT EXISTS kronika_czas ON kronika (wlasciciel, utworzono);
 CREATE TABLE IF NOT EXISTS przypomnienia_uwagi (
     wlasciciel TEXT NOT NULL,
     dzien TEXT NOT NULL,
@@ -663,3 +678,122 @@ def zapisz_wsparcie(w: str, *, teraz: datetime | None = None, sciezka: Path | No
     dzien = (teraz or kontakt.teraz()).astimezone(kontakt.strefa()).date().isoformat()
     with closing(_polacz(sciezka)) as db:
         db.execute("INSERT OR IGNORE INTO wsparcie (wlasciciel, dzien) VALUES (?,?)", (w, dzien))
+
+
+# --- podsumowanie tygodnia, Kronika, eksport i usuwanie (FR-9, FR-16, prywatność) ----------------
+
+POWAZNOSC_UWAGI = {"hyperfocus": 2, "hypofocus": 1, "normal": 0}
+
+
+def dni_tygodnia(w: str, koniec: date, *, dni: int = 7, sciezka: Path | None = None) -> list[dict]:
+    """Okno `dni` dób kończące się na `koniec` (włącznie), od najstarszej. Dla każdej doby: ostatni tryb dnia (`cwiartka`),
+    stan uwagi dnia (`uwaga`: hiperfokus, jeśli był choć raz, potem rozproszenie, inaczej norma) i godzina pierwszego
+    zgłoszenia hiperfokusu (`start_hiper`, godzina lokalna). Doba bez wpisu ma wszystkie pola None. Jedno zapytanie."""
+    w = _wymagaj_wlasciciela(w)
+    z = kontakt.strefa()
+    start = koniec - timedelta(days=dni - 1)
+    od = _utc(datetime(start.year, start.month, start.day, tzinfo=z))
+    do = _utc(datetime(koniec.year, koniec.month, koniec.day, tzinfo=z) + timedelta(days=1))
+    with closing(_polacz(sciezka)) as db:
+        wpisy = db.execute("SELECT utworzono, cwiartka, uwaga FROM wpisy_stanu WHERE wlasciciel=? AND utworzono>=? AND utworzono<? "
+                           "ORDER BY utworzono, rowid", (w, od, do)).fetchall()
+    po_dniach: dict[date, dict] = {}
+    for r in wpisy:
+        t = datetime.fromisoformat(r["utworzono"]).astimezone(z)
+        d = po_dniach.setdefault(t.date(), {"cwiartka": None, "uwaga": "normal", "start_hiper": None})
+        d["cwiartka"] = r["cwiartka"]
+        if POWAZNOSC_UWAGI[r["uwaga"]] > POWAZNOSC_UWAGI[d["uwaga"]]:
+            d["uwaga"] = r["uwaga"]
+        if r["uwaga"] == "hyperfocus" and d["start_hiper"] is None:
+            d["start_hiper"] = t.hour
+    wynik = []
+    for i in range(dni):
+        d = start + timedelta(days=i)
+        e = po_dniach.get(d)
+        wynik.append({"dzien": d.isoformat(), **(e or {"cwiartka": None, "uwaga": None, "start_hiper": None})})
+    return wynik
+
+
+def zapisz_podsumowanie_tygodnia(w: str, tydzien: str, tekst: str, dane: str, *, teraz: datetime | None = None,
+                                 sciezka: Path | None = None) -> bool:
+    """Atomowo „zajmuje” tydzień ISO (np. 2026-W41) i zapisuje podsumowanie w Kronice. True tylko za pierwszym razem,
+    więc to samo podsumowanie nie wyjdzie dwa razy, nawet przy równoległych turach."""
+    w = _wymagaj_wlasciciela(w)
+    with closing(_polacz(sciezka)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            nowe = db.execute("INSERT OR IGNORE INTO podsumowania (wlasciciel, tydzien) VALUES (?,?)", (w, tydzien)).rowcount == 1
+            if nowe:
+                db.execute("INSERT INTO kronika (id, wlasciciel, utworzono, rodzaj, tekst, dane) VALUES (?,?,?,?,?,?)",
+                           ("n_" + secrets.token_hex(6), w, _utc(teraz or kontakt.teraz()), "tydzien", tekst, dane))
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+    return nowe
+
+
+def podsumowanie_juz_bylo(w: str, tydzien: str, *, sciezka: Path | None = None) -> bool:
+    w = _wymagaj_wlasciciela(w)
+    with closing(_polacz(sciezka)) as db:
+        return db.execute("SELECT 1 FROM podsumowania WHERE wlasciciel=? AND tydzien=?", (w, tydzien)).fetchone() is not None
+
+
+def falszywe_alarmy(w: str, *, sciezka: Path | None = None) -> dict:
+    """Metryka z dokumentu (cel ≤ 30%): ile odpowiedzi „nie” na pytania o stan i ile odpowiedzi w ogóle."""
+    w = _wymagaj_wlasciciela(w)
+    with closing(_polacz(sciezka)) as db:
+        r = db.execute("SELECT COUNT(DISTINCT substr(utworzono,1,10) || cel), "
+                       "COUNT(DISTINCT CASE WHEN potwierdzone=0 THEN substr(utworzono,1,10) || cel END) "
+                       "FROM sygnaly_stanu WHERE wlasciciel=? AND zapytano=1 AND potwierdzone IS NOT NULL", (w,)).fetchone()
+    razem, nie = r[0], r[1]
+    return {"razem": razem, "nie": nie, "odsetek": round(100 * nie / razem) if razem else None}
+
+
+TABELE_DANYCH = ("wpisy_stanu", "sygnaly_stanu", "siatka_pokazana", "oszacowania", "wsparcie", "przypomnienia_uwagi",
+                 "aktywnosc", "wiadomosci_dl", "podsumowania", "kronika")
+
+
+def eksport(w: str, *, sciezka: Path | None = None) -> dict:
+    """Wszystkie dane stanu właściciela w jednym słowniku (do pliku JSON). Bez treści rozmów, bo ich nie zapisujemy."""
+    w = _wymagaj_wlasciciela(w)
+    with closing(_polacz(sciezka)) as db:
+        tabele = {t: [dict(r) for r in db.execute(f"SELECT * FROM {t} WHERE wlasciciel=?", (w,))] for t in TABELE_DANYCH}
+    return {"format": "bibo-stan-1", "wyeksportowano": _utc(kontakt.teraz()),
+            "strefa": getattr(kontakt.strefa(), "key", "UTC"), "tabele": tabele,
+            "metryki": {"falszywe_alarmy": falszywe_alarmy(w, sciezka=sciezka)}}
+
+
+def policz_dane(w: str, *, sciezka: Path | None = None) -> dict[str, int]:
+    w = _wymagaj_wlasciciela(w)
+    with closing(_polacz(sciezka)) as db:
+        return {t: db.execute(f"SELECT COUNT(*) FROM {t} WHERE wlasciciel=?", (w,)).fetchone()[0] for t in TABELE_DANYCH}
+
+
+def usun_wszystko(w: str, *, sciezka: Path | None = None) -> dict:
+    """Kasuje wszystkie dane stanu właściciela jedną transakcją i czyści plik bazy, żeby usunięte wiersze nie zostały
+    odzyskiwalne: `secure_delete` zeruje zwolnione strony, a checkpoint WAL (z kilkoma ponowieniami, bo blokuje go każdy
+    równoległy czytelnik) i VACUUM usuwają ich kopie. Zwraca liczbę usuniętych wierszy po tabelach oraz
+    `plik_wyczyszczony` (False, gdy WAL nie dał się obciąć — wtedy stare strony znikną przy kolejnych zapisach)."""
+    w = _wymagaj_wlasciciela(w)
+    with closing(_polacz(sciezka)) as db:
+        db.execute("PRAGMA secure_delete=ON")
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            usuniete = {t: db.execute(f"DELETE FROM {t} WHERE wlasciciel=?", (w,)).rowcount for t in TABELE_DANYCH}
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+        db.execute("PRAGMA busy_timeout=200")   # komenda działa w wątku gatewaya: czekamy krótko, nie 5 s na każdą próbę
+        czysty = False
+        for proba in range(3):
+            if db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0] == 0:   # 0 = nie zablokowany
+                czysty = True
+                break
+            time.sleep(0.1)
+        try:
+            db.execute("VACUUM")
+        except sqlite3.OperationalError:   # inny czytelnik trzyma bazę: dane z tabel i tak zniknęły
+            czysty = False
+    return {**usuniete, "plik_wyczyszczony": czysty}

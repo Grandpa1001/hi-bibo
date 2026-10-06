@@ -36,6 +36,21 @@ class Widget(BazaApi):
         d = await (await self.POST("/api/stan", {"energia": -2, "przyjemnosc": 2, "uwaga": "hyperfocus"})).json()
         self.assertEqual((d["dzis"]["cwiartka"], d["dzis"]["uwaga"]), ("steady", "hyperfocus"))
 
+    async def test_karta_tygodnia_dopiero_od_dwoch_dni_z_wpisem(self):
+        from datetime import timedelta
+        kontakt = podmodul("bibo-tryby", "kontakt")
+        d = await (await self.GET("/api/stan")).json()
+        self.assertIsNone(d["podsumowanie"])
+        for dni in (1, 2, 3):
+            stan.zapisz_wpis(str(UID), 2, 2, teraz=kontakt.teraz() - timedelta(days=dni))
+        d = await (await self.GET("/api/stan")).json()
+        p = d["podsumowanie"]
+        self.assertEqual((p["dni_z_wpisem"], p["tryby"]["peak"], p["uwaga"]["normal"]), (3, 3, 3))
+        self.assertIn("Najczęstszy tryb tygodnia", p["wniosek_trybow"])
+        self.assertNotIn("domkniecia", p)        # nie wystawiamy zbędnych danych do przeglądarki
+        r = await self.POST("/api/stan", {"energia": 1, "przyjemnosc": 1})
+        self.assertNotIn("podsumowanie", await r.json())   # tylko odczyt liczy podsumowanie, nie zapis
+
     async def test_slowo_notatka_i_uwaga(self):
         await self.POST("/api/stan", {"energia": 2, "przyjemnosc": 2})
         r = await self.POST("/api/stan/doprecyzuj", {"slowo": "skupiony", "notatka": "dobry start"})

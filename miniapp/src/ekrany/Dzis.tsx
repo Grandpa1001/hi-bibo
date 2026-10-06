@@ -4,6 +4,7 @@ import { api, type Hub, type StanWidok } from "../api";
 import { idz } from "../stan";
 import { DOMYSLNE_GRY, KartaGry } from "../ui/Gry";
 import { Postac, usePrzyciski } from "../ui/ui";
+import { PodsumowanieTygodnia } from "../ui/Tydzien";
 import { Widget } from "../ui/Widget";
 
 function powitanie() {
@@ -38,6 +39,8 @@ export function Dzis() {
 
       {stan === null && <div class="widget szkielet" aria-hidden="true" />}
       {stan?.wlaczone && <Widget dzis={stan.dzis ?? null} tydzien={stan.tydzien ?? []} onClick={() => idz("stan")} />}
+
+      {stan?.podsumowanie && <PodsumowanieTygodnia p={stan.podsumowanie} />}
 
       <section class="sekcja" aria-labelledby="gry-tytul">
         <div class="sekcja-naglowek">

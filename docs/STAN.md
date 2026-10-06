@@ -77,6 +77,33 @@ ani przypomnień, a Bibo odpowiada krótko i ciepło. Działa to w kodzie, takż
 wiadomości nie jest nigdzie zapisywana. Wzorce są szerokie celowo: lepiej raz niepotrzebnie podać numer niż przeoczyć
 prawdziwy kryzys.
 
+## Podsumowanie tygodnia
+
+Raz w tygodniu (ISO) Bibo składa z Twoich danych podsumowanie: **rozkład trybów** (ile dni w każdym), **rozkład stanów uwagi**
+i po jednym krótkim wniosku w każdej części, np. „najwięcej zakończonych spraw przypadło na tryb Stabilnie” albo
+„hiperfokus zaczynał się najczęściej po południu”. Wnioski opisują, co było w danych, nie dlaczego; znikają, gdy danych jest za mało.
+Tryb dnia to ostatni wpis doby, a uwaga dnia — najmocniejszy stan zgłoszony tego dnia (hiperfokus, potem rozproszenie).
+
+- **Kiedy wychodzi.** Okno to 7 pełnych dób do wczoraj, potrzebne są co najmniej 2 dni z wpisem. Bibo wysyła je przy pierwszej
+  okazji: tuż po wpisie z siatki albo po zwykłej wiadomości, nigdy jako osobne przypomnienie. W dobie kryzysu nie wychodzi.
+- **`/tydzien`** pokazuje ostatnie 7 dni (z dzisiejszym) na żądanie, bez zapisu. W Mini App to samo okno widać w karcie „Twój tydzień”
+  na zakładce Dziś.
+- **Kronika.** Podsumowanie wysłane automatycznie zapisuje się w lokalnej Kronice (tabela `kronika` w `stan.sqlite3`), razem z danymi
+  liczbowymi. Trafia do eksportu i znika przy usuwaniu danych. Zewnętrznych issues ta instancja nie widzi: „domknięcia” to karty spraw.
+
+## Twoje dane: eksport i usuwanie
+
+Dane stanu leżą tylko na tej instancji (`local/bibo_tryby/stan.sqlite3`), bez usług analitycznych.
+
+- **`/stan_eksport`** wysyła do czatu plik `stan-RRRR-MM-DD.json` ze wszystkimi danymi: wpisy, sygnały, aktywność, Kronika i metryka
+  fałszywych alarmów (odsetek odpowiedzi „Nie” na pytania o stan). Kopia tymczasowa na dysku znika po wysyłce.
+- **`/stan_usun`** pokazuje, ile danych jest, i prosi o potwierdzenie. **`/stan_usun potwierdzam`** kasuje wszystko jedną
+  transakcją i czyści plik bazy (zwolnione strony są zerowane, WAL obcinany, `VACUUM`), więc dane nie zostają odzyskiwalne.
+  Jeśli plik był w tej chwili używany, Bibo mówi o tym wprost, a komendę można powtórzyć.
+- Obie komendy działają także przy `stan: false`.
+- **Poza zakresem usuwania:** karta sprawy (usuwa ją narzędzie `bibo_karta`), notatki, które Bibo zapisał we własnej pamięci
+  Hermesa (np. „POMYSŁ: …”), oraz wiadomości w historii Telegrama.
+
 ## Zaangażowanie w tle
 
 Zaangażowania nie pytamy. Bibo zapisuje wyłącznie znaczniki czasu tur (liczba tur, sesje przedzielone przerwą
@@ -87,4 +114,4 @@ Issues z zewnętrznych narzędzi ta instancja nie widzi.
 
 - `{"stan": false}` w `local/bibo_tryby/ustawienia.json` wyłącza siatkę, przechwytywanie i liczenie tur.
 - Dane: `local/bibo_tryby/stan.sqlite3` (osobno od `karta.sqlite3`; stare wersje wtyczki go ignorują).
-- Dane zostają na instancji. Eksport i usuwanie jedną komendą dojdą w kroku 7.
+- Dane zostają na instancji; eksport i usuwanie opisuje sekcja „Twoje dane” powyżej.

@@ -22,9 +22,13 @@ export type StanDzis = {
   cwiartka: Cwiartka; nazwa: string; energia: number; przyjemnosc: number; uwaga: Uwaga; slowo: string | null; slowa: string[];
 };
 export type StanDzien = { dzien: string; cwiartka: Cwiartka | null; uwaga: Uwaga | null };
+export type Podsumowanie = {
+  od: string; do: string; dni_z_wpisem: number; dni_bez_wpisu: number;
+  tryby: Record<Cwiartka, number>; uwaga: Record<Uwaga, number>; wniosek_trybow: string | null; wniosek_uwagi: string | null;
+};
 /** `wlaczone: false` = widget się nie pokazuje (funkcja wyłączona albo to nie właściciel). */
 export type StanWidok = {
-  wlaczone: boolean; dzis?: StanDzis | null; tydzien?: StanDzien[]; reakcja?: string; komunikat?: string;
+  wlaczone: boolean; dzis?: StanDzis | null; tydzien?: StanDzien[]; reakcja?: string; komunikat?: string; podsumowanie?: Podsumowanie | null;
 };
 
 export class BladApi extends Error {
@@ -132,12 +136,23 @@ export function cwiartkaZOsi(energia: number, przyjemnosc: number): Cwiartka {
   return energia > 0 ? (przyjemnie ? "peak" : "tension") : (przyjemnie ? "steady" : "recovery");
 }
 
+const PODSUMOWANIE_DEMO: Podsumowanie = {
+  od: dzienISO(-6), do: dzienISO(0), dni_z_wpisem: 6, dni_bez_wpisu: 1,
+  tryby: { peak: 1, steady: 2, tension: 2, recovery: 1 }, uwaga: { hypofocus: 1, normal: 3, hyperfocus: 2 },
+  wniosek_trybow: "Najczęstszy tryb tygodnia: Stabilnie (2 z 6 dni z wpisem).",
+  wniosek_uwagi: "Hiperfokus zaczynał się najczęściej po południu (2 z 2 dni).",
+};
+
+function dzienISO(przes: number) {
+  return new Date(Date.now() + przes * 86_400_000).toISOString().slice(0, 10);
+}
+
 function sztucznyStan() {
   const dzien = (przes: number) => { const d = new Date(Date.now() + przes * 86_400_000); return d.toISOString().slice(0, 10); };
   const poprzednie: (Cwiartka | null)[] = ["steady", "tension", null, "recovery", "peak", "steady"];
   let dzis: StanDzis | null = null;
   const widok = (dodatek: Partial<StanWidok> = {}): StanWidok => ({
-    wlaczone: true, dzis,
+    wlaczone: true, dzis, podsumowanie: PODSUMOWANIE_DEMO,
     tydzien: [...poprzednie.map((c, i) => ({ dzien: dzien(i - 6), cwiartka: c, uwaga: c ? "normal" as Uwaga : null })),
               { dzien: dzien(0), cwiartka: dzis?.cwiartka ?? null, uwaga: dzis?.uwaga ?? null }],
     ...dodatek,
