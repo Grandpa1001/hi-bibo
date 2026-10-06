@@ -26,7 +26,7 @@ from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import kontakt, magazyn
+from . import karta, kontakt, magazyn
 
 CWIARTKI = ("peak", "steady", "tension", "recovery")
 UWAGA = ("hypofocus", "normal", "hyperfocus")
@@ -73,9 +73,21 @@ CREATE TABLE IF NOT EXISTS siatka_pokazana (
     dzien TEXT NOT NULL,
     PRIMARY KEY (wlasciciel, dzien)
 );
+CREATE TABLE IF NOT EXISTS aktywnosc (
+    wlasciciel TEXT NOT NULL,
+    dzien TEXT NOT NULL,
+    tury INTEGER NOT NULL DEFAULT 0,
+    sesje INTEGER NOT NULL DEFAULT 0,
+    sekundy INTEGER NOT NULL DEFAULT 0,
+    start_sesji TEXT NOT NULL,
+    ostatnia TEXT NOT NULL,
+    PRIMARY KEY (wlasciciel, dzien)
+);
 """
 _gotowe: set[str] = set()   # bazy ze świeżo sprawdzonym schematem: nie powtarzamy go przy każdej turze
 DNI_POKAZU = 14
+PRZERWA_SESJI_MIN = 30       # dłuższa przerwa między turami zaczyna nową sesję
+DNI_AKTYWNOSCI = 60
 
 
 class BladStanu(Exception):
@@ -266,6 +278,57 @@ def czy_pokazac_siatke(w: str, *, teraz: datetime | None = None, sciezka: Path |
             db.execute("ROLLBACK")
             raise
     return pokazac
+
+
+# --- aktywność w tle (FR-10) ---------------------------------------------------------
+
+def rejestruj_ture(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict | None:
+    """Wołane raz na turę właściciela: jedno połączenie i jedna krótka transakcja. Liczy tylko
+    znaczniki czasu (tury, sesje, czas), nigdy treść rozmowy. Zwraca dzisiejszy wpis stanu
+    (jego `cwiartka` to tryb dnia), żeby hook nie otwierał bazy drugi raz."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    dzien = teraz.astimezone(kontakt.strefa()).date()
+    t = _utc(teraz)
+    with closing(_polacz(sciezka)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            r = db.execute("SELECT * FROM aktywnosc WHERE wlasciciel=? AND dzien=?", (w, dzien.isoformat())).fetchone()
+            if not r:
+                db.execute("INSERT INTO aktywnosc (wlasciciel, dzien, tury, sesje, sekundy, start_sesji, ostatnia) "
+                           "VALUES (?,?,1,1,0,?,?)", (w, dzien.isoformat(), t, t))
+                db.execute("DELETE FROM aktywnosc WHERE dzien<?", ((dzien - timedelta(days=DNI_AKTYWNOSCI)).isoformat(),))
+            else:
+                przerwa = int((teraz - datetime.fromisoformat(r["ostatnia"])).total_seconds())
+                if przerwa > PRZERWA_SESJI_MIN * 60:
+                    db.execute("UPDATE aktywnosc SET tury=tury+1, sesje=sesje+1, start_sesji=?, ostatnia=? WHERE wlasciciel=? AND dzien=?",
+                               (t, t, w, dzien.isoformat()))
+                else:
+                    db.execute("UPDATE aktywnosc SET tury=tury+1, sekundy=sekundy+?, ostatnia=? WHERE wlasciciel=? AND dzien=?",
+                               (max(przerwa, 0), t, w, dzien.isoformat()))
+            wpis = _ostatni_dzis(db, w, teraz)
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+        return dict(wpis) if wpis else None
+
+
+def zaangazowanie(w: str, *, teraz: datetime | None = None, sciezka: Path | None = None,
+                  sciezka_karty: Path | None = None) -> dict:
+    """FR-10: zaangażowanie dnia z aktywności, bez pytania usera. `domkniecia` to karty spraw zakończone
+    tego dnia; zewnętrznych issues ta instancja nie widzi."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    z = kontakt.strefa()
+    dzien = teraz.astimezone(z).date()
+    with closing(_polacz(sciezka)) as db:
+        r = db.execute("SELECT tury, sesje, sekundy FROM aktywnosc WHERE wlasciciel=? AND dzien=?",
+                       (w, dzien.isoformat())).fetchone()
+    domkniecia = sum(1 for k in karta.odczytaj(w, status="zakonczona", sciezka=sciezka_karty)
+                     if datetime.fromisoformat(k["zaktualizowano"]).astimezone(z).date() == dzien)
+    return {"dzien": dzien.isoformat(), "tury": r["tury"] if r else 0, "sesje": r["sesje"] if r else 0,
+            "minuty": (r["sekundy"] // 60) if r else 0, "domkniecia": domkniecia}
 
 
 # --- sygnały gorszego dnia / uwagi ------------------------------------------------

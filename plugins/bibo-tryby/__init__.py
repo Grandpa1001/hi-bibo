@@ -4,7 +4,8 @@ Wtyczka dotyka Bibo w trzech miejscach, wszystkie opcjonalne:
 - `pre_gateway_dispatch` — zapamiętuje źródło rozmowy; jedyne, co przechwytuje, to
   stuknięcia w siatkę stanu dnia właściciela (`siatka.py`, bez udziału modelu),
 - `pre_llm_call` — dokleja zaległą notatkę z Mini App (fallback) i krótkie
-  podsumowanie karty bieżącej sprawy,
+  podsumowanie karty bieżącej sprawy oraz tryb dnia (`tryb.py`; przy okazji liczy turę
+  do zaangażowania, same czasy bez treści),
 - `post_llm_call` — raz dziennie, po pierwszej turze, pokazuje siatkę stanu dnia;
   wykrywa znacznik propozycji `[[tryb:detektyw]]`
   (znacznik z tekstu usuwa `bibo-podpis`; `transform_llm_output` bierze tylko
@@ -17,7 +18,7 @@ from __future__ import annotations
 
 import logging
 
-from . import czat, gateway_most, karta, karta_narzedzie, kontakt, siatka, stan, uslugi
+from . import czat, gateway_most, karta, karta_narzedzie, kontakt, siatka, stan, tryb, uslugi
 
 log = logging.getLogger("bibo-tryby")
 ZNACZNIK = "[[tryb:detektyw]]"
@@ -78,10 +79,22 @@ def _komenda_stan(raw_args: str = "") -> str | None:
     return None
 
 
+def _tryb_dnia(sender_id: str) -> str | None:
+    """FR-3/FR-10: zlicza turę (czasy, bez treści) i zwraca wytyczne trybu dnia — jedno połączenie z bazą."""
+    w = _stan_wlasciciela(sender_id)
+    if not w:
+        return None
+    try:
+        return tryb.kontekst(stan.rejestruj_ture(w))
+    except Exception:
+        log.debug("bibo-tryby: tryb dnia", exc_info=True)
+        return None
+
+
 def _przed_tura(platform: str = "", sender_id: str = "", **_):
     try:
         if platform == "telegram":
-            czesci = [gateway_most.odbierz_notatki(), karta_narzedzie.podsumowanie(sender_id)]
+            czesci = [gateway_most.odbierz_notatki(), karta_narzedzie.podsumowanie(sender_id), _tryb_dnia(sender_id)]
             czesci = [c for c in czesci if c]
             if czesci:
                 return {"context": "\n\n".join(czesci)}

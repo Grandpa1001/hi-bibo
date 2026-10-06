@@ -16,11 +16,10 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from . import magazyn, stan
+from . import karta, magazyn, stan, tryb
 
 log = logging.getLogger("bibo-tryby")
 
-NAZWY = {"peak": "Szczyt", "steady": "Stabilnie", "tension": "Napięcie", "recovery": "Regeneracja"}
 ENERGIA = {2: "⚡⚡", 1: "⚡", -1: "🌙", -2: "🌙🌙"}
 PRZYJEMNOSC = {-2: "😣", -1: "🙁", 1: "🙂", 2: "😄"}
 PRZYCISK_POMIN = "⏭ Pomiń"
@@ -64,8 +63,12 @@ def _odp(tekst: str, markup: dict | None = None) -> dict:
 
 def _po_tapnieciu(w: str, e: int, p: int, teraz, sciezka) -> dict:
     r = stan.zapisz_wpis(w, e, p, zrodlo="manual", teraz=teraz, sciezka=sciezka)
-    return _odp(f"Zapisane: {NAZWY[r['cwiartka']]}. Jedno słowo, jeśli chcesz — albo pomiń.",
-                _klawiatura_slow(r["cwiartka"]))
+    try:
+        a = karta.aktywna(w)
+    except Exception:
+        a = None   # reakcja bez kroku z karty jest lepsza niż brak reakcji
+    return _odp(f"Zapisane: {tryb.nazwa(r['cwiartka'])}. {tryb.reakcja(r['cwiartka'], a and a['krok'])}\n\n"
+                "Jedno słowo, jeśli chcesz — albo pomiń.", _klawiatura_slow(r["cwiartka"]))
 
 
 def rozpoznaj(tekst: str) -> bool:
