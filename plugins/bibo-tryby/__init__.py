@@ -223,11 +223,38 @@ def _komenda_fokus(raw_args: str = "") -> str | None:
     return None
 
 
-def _przed_tura(platform: str = "", sender_id: str = "", user_message=None, **_):
+# Hermes zapisuje kontekst z `pre_llm_call` w historii i odtwarza go w każdej kolejnej turze. Powtarzanie tej samej
+# linii co turę kumulowało się w oknie (ok. 400 tokenów na wiadomość) i wypychało rozmowę ponad próg kompresji.
+# Dlatego linię stanu (karta sprawy, tryb dnia) wstawiamy przy zmianie, w nowej sesji i co ODSWIEZ_CO_TUR tur
+# (kompresja historii mogła zwinąć starą kopię); w pozostałych turach model widzi ją w poprzednich wiadomościach.
+ODSWIEZ_CO_TUR = 6
+_wstrzykniete: dict[tuple[str, str], tuple[str, int, int]] = {}   # (user, klucz) -> (sesja, skrót, tur od wstrzyknięcia)
+
+
+def _raz_na_zmiane(uid: str, klucz: str, tekst: str | None, sesja: str = "", pierwsza_tura: bool = False) -> str | None:
+    k = (str(uid), klucz)
+    if not tekst:
+        _wstrzykniete.pop(k, None)   # po zniknięciu linii (np. karta zakończona) następna ma wejść od razu
+        return None
+    skrot = hash(tekst)
+    stare = _wstrzykniete.get(k)
+    if stare and not pierwsza_tura and stare[0] == sesja and stare[1] == skrot and stare[2] + 1 < ODSWIEZ_CO_TUR:
+        _wstrzykniete[k] = (sesja, skrot, stare[2] + 1)
+        return None
+    _wstrzykniete[k] = (sesja, skrot, 0)
+    return tekst
+
+
+def _przed_tura(platform: str = "", sender_id: str = "", user_message=None, session_id: str = "",
+                is_first_turn: bool = False, **_):
     try:
         if platform == "telegram":
-            czesci = [kryzys.kontekst(sender_id), gateway_most.odbierz_notatki(), karta_narzedzie.podsumowanie(sender_id),
-                      _tryb_dnia(sender_id, user_message)]
+            sesja = str(session_id or "")
+            # Tura musi być zliczona zawsze (aktywność), a deduplikujemy dopiero jej tekst.
+            tryb_dnia = _tryb_dnia(sender_id, user_message)
+            czesci = [kryzys.kontekst(sender_id), gateway_most.odbierz_notatki(),
+                      _raz_na_zmiane(sender_id, "karta", karta_narzedzie.podsumowanie(sender_id), sesja, is_first_turn),
+                      _raz_na_zmiane(sender_id, "tryb", tryb_dnia, sesja, is_first_turn)]
             czesci = [c for c in czesci if c]
             if czesci:
                 return {"context": "\n\n".join(czesci)}

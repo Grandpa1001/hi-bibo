@@ -108,6 +108,16 @@ fi
 
 [[ -n "${BIBO_SHA:-}" ]] && { echo "$BIBO_SHA" > "$WERSJA_PLIK"; fix_owner "$WERSJA_PLIK"; }
 
+# Migracja progu kompresji (jednorazowa, bezpieczna): moduł stanu dnia podniósł stały prompt, więc stary próg
+# z instalatora (16000 / 12) zostawiał za mało miejsca na rozmowę. Zmieniamy TYLKO te dokładne wartości; własne
+# ustawienia użytkownika zostają bez zmian.
+if [[ "$(hermes config get compression.threshold_tokens 2>/dev/null | tr -d '[:space:]')" == "16000" ]]; then
+  hermes config set compression.threshold_tokens 20000 >/dev/null && echo "próg kompresji 16000 → 20000 ✓"
+fi
+if [[ "$(hermes config get compression.protect_last_n 2>/dev/null | tr -d '[:space:]')" == "12" ]]; then
+  hermes config set compression.protect_last_n 8 >/dev/null && echo "protect_last_n 12 → 8 ✓"
+fi
+
 say "Restart Bibo"
 if hermes gateway restart; then
   echo "Gateway zrestartowany ✓"
@@ -116,4 +126,4 @@ else
 fi
 
 say "Gotowe 🫧 ${BIBO_SHA:+(wersja ${BIBO_SHA:0:7})}"
-echo "  Tryby w Telegramie: przycisk 🎲 Tryby (po ok. 10 s)"
+echo "  Aplikacja Bibo w Telegramie: przycisk „Bibo” obok pola wiadomości (po ok. 10 s)"

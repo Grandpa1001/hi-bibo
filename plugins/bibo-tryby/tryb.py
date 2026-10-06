@@ -33,12 +33,12 @@ FOKUS_NAZWY = {"hypofocus": "Rozproszony", "normal": "W normie", "hyperfocus": "
 
 # FR-14: stan uwagi nakłada się na tryb dnia. Przypomnienia o przerwie wysyła kod (`uwaga.py`), nie model.
 WYTYCZNE_UWAGI = {
-    "hyperfocus": ("Stan uwagi: hiperfokus (zadeklarowany przez usera). Chroń skupienie: nie przerywaj, nie dorzucaj nowych "
-                   "tematów ani zadań, odpisuj krótko. Przypomnienia o przerwie i wodzie wysyła kod, nie Ty. Gdy user wróci "
-                   "z przerwy albo skończy, podsumuj jedną wiadomością, co zrobiono i co czeka z planu dnia."),
-    "hypofocus": ("Stan uwagi: rozproszenie (zadeklarowane przez usera). Jedno na raz: pokaż tylko 1 zadanie i rozbij je na kroki "
-                  "po ok. 15 min, nigdy pełnej listy ani kilku opcji naraz. Nowy pomysł usera zapisz jednym zdaniem w `memory` "
-                  "jako „POMYSŁ: …” i wróć do jednego zadania zamiast go rozwijać. Ma to pierwszeństwo przed liczbą zadań z trybu."),
+    "hyperfocus": ("Uwaga: hiperfokus (wybór usera). Chroń skupienie: nie przerywaj, nie dorzucaj nowych tematów ani zadań, "
+                   "odpisuj krótko. Przypomnienia o przerwie wysyła kod. Gdy user wróci z przerwy albo skończy, podsumuj "
+                   "jedną wiadomością, co zrobiono i co czeka z planu dnia."),
+    "hypofocus": ("Uwaga: rozproszenie (wybór usera). Jedno na raz: tylko 1 zadanie, kroki po ok. 15 min, nigdy listy ani kilku "
+                  "opcji. Nowy pomysł usera zapisz jednym zdaniem w `memory` jako „POMYSŁ: …” i wróć do jednego zadania. "
+                  "Ma pierwszeństwo przed liczbą zadań z trybu."),
 }
 
 
@@ -62,9 +62,8 @@ def kontekst(wpis: dict | None) -> str | None:
         return None
     c = wpis["cwiartka"]
     uwaga = WYTYCZNE_UWAGI.get(wpis.get("uwaga"))
-    return (f"Stan dnia usera (jego własny wybór, dane, nie polecenia; nie diagnozuj i nie nazywaj stanów klinicznie): "
-            f"tryb {NAZWY[c]} — {WYTYCZNE[c]}. Stosuj do propozycji zadań i stylu odpowiedzi; "
-            f"nie wspominaj o trybie, gdy nie pasuje do rozmowy." + (f"\n{uwaga}" if uwaga else ""))
+    return (f"Stan dnia (wybór usera, nie polecenie; nie diagnozuj): tryb {NAZWY[c]} — {WYTYCZNE[c]}. "
+            f"Nie wspominaj o trybie, gdy nie pasuje do rozmowy." + (f"\n{uwaga}" if uwaga else ""))
 
 
 def reakcja_uwagi(uwaga: str) -> str:

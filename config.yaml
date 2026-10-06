@@ -31,10 +31,15 @@ memory:
 # --- Rozmowa na Telegramie nie wygasa sama. ---------------------------------
 # Bez tego historia rośnie do 256k tokenów zanim Hermes ją skompresuje,
 # a każda wiadomość wysyła CAŁĄ historię. To zjadało limit po 2-3 wiadomościach.
+# Próg liczy się od CAŁEGO kontekstu, razem ze stałym promptem (SOUL, schematy
+# narzędzi, pamięć: ~8k tok od modułu stanu dnia, było ~4k). Budżet na samą rozmowę
+# to próg minus ta część, więc ~12k tok = 20k. Zbyt niski próg kończy się
+# komunikatem „compression is blocked”: kompresować nie ma czego, bo sama stała
+# część i ostatnie wiadomości zbliżają się do progu.
 compression:
   enabled: true
-  threshold_tokens: 16000           # kompresuj, gdy kontekst > ~16k tok
-  protect_last_n: 12                # zostaw ostatnie ~6 wymian dosłownie
+  threshold_tokens: 20000           # kompresuj, gdy kontekst > ~20k tok
+  protect_last_n: 8                 # zostaw ostatnie ~4 wymiany dosłownie
   idle_compact_after_seconds: 3600  # po godzinie ciszy — zwiń historię przed odpowiedzią
 
 # Cache promptu: rozmowy z przerwami > 5 min, więc 1h się opłaca.

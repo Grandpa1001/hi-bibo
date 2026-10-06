@@ -72,7 +72,8 @@ w nowej jest ucinana i streszczana przy ~16 tys.
 - **Decyzja:** wiedza o ADHD i pytania sokratejskie **wprost w `SOUL.md`** (~1 tys. tokenów), zamiast skilla. Skill wymaga narzędzia `skills` (5 KB schematu w każdym zapytaniu) i dodatkowej tury, żeby go wczytać — przy jednym małym skillu to się nie opłaca.
 
 ### D. Historia rozmowy
-- **Decyzja:** `compression.threshold_tokens: 16000`, `protect_last_n: 12`, `idle_compact_after_seconds: 3600` (po godzinie ciszy historia jest zwijana przed odpowiedzią), streszczanie na Haiku, `prompt_caching.cache_ttl: 1h`.
+- **Decyzja:** `compression.threshold_tokens: 20000`, `protect_last_n: 8`, `idle_compact_after_seconds: 3600` (po godzinie ciszy historia jest zwijana przed odpowiedzią), streszczanie na Haiku, `prompt_caching.cache_ttl: 1h`.
+- **Korekta (moduł stanu dnia):** stały prompt urósł z ~4 do ~8 tys. tokenów (SOUL.md, schemat `bibo_karta`, pamięć), a próg liczy się od całego kontekstu. Przy progu 16 000 zostawało za mało miejsca na rozmowę i Hermes zgłaszał „compression is blocked (structural_backoff)”. Próg = stała część + ok. 12 tys. na rozmowę, czyli 20 000; `protect_last_n` 8, żeby było co kompresować. Linie kontekstu doklejane co turę (karta, tryb) Hermes zapisuje w historii, więc wstawiamy je tylko przy zmianie i co 6 tur.
 - **Efekt:** koszt wiadomości nie rośnie z wiekiem rozmowy. Ciągłość niesie pamięć (punkt E), a nie surowa historia.
 
 ### E. Pamięć o Tobie (serce produktu)
