@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 
-from . import czat, gateway_most, karta, karta_narzedzie, kontakt, siatka, stan, tryb, uslugi
+from . import czat, gateway_most, karta, karta_narzedzie, kontakt, siatka, stan, tryb, uslugi, uwaga
 
 log = logging.getLogger("bibo-tryby")
 ZNACZNIK = "[[tryb:detektyw]]"
@@ -91,6 +91,37 @@ def _tryb_dnia(sender_id: str) -> str | None:
         return None
 
 
+def _komenda_fokus(raw_args: str = "") -> str | None:
+    """FR-11: `/fokus` pokazuje rząd stanu uwagi; `/fokus hiper|rozproszony|norma` ustawia od razu."""
+    w = karta.wlasciciel()
+    u = uslugi.aktywne()
+    if not w or not siatka.wlaczone():
+        return "Stan uwagi jest niedostępny w tej instancji."
+    wybor = uwaga.z_argumentu(raw_args)
+    if (raw_args or "").strip() and not wybor:
+        return "Podaj: rozproszony, norma albo hiperfokus — albo samo /fokus, a pokażę przyciski."
+    try:
+        if wybor:
+            return uwaga.wybierz(w, wybor)
+        if not (u and u.bot):
+            return "Teraz nie mogę pokazać przycisków — spróbuj za chwilę."
+        if stan.dzisiejszy(w) is None:
+            u.zleć(siatka.wyslij(w, u, {"text": "Najpierw wpis na siatce — potem ustawię stan uwagi.",
+                                         "reply_markup": siatka.klawiatura_siatki()}))
+        else:
+            u.zleć(siatka.wyslij(w, u, {"text": "Jak z uwagą?", "reply_markup": siatka.klawiatura_uwagi()}))
+    except stan.BladStanu as e:
+        if e.kod != "brak_wpisu":
+            return f"Nie zapisałem tego: {e.komunikat}"
+        if u and u.bot:
+            u.zleć(siatka.wyslij(w, u, {"text": "Najpierw wpis na siatce — potem ustawię stan uwagi.",
+                                         "reply_markup": siatka.klawiatura_siatki()}))
+    except Exception:
+        log.warning("bibo-tryby: /fokus", exc_info=True)
+        return "Nie udało się zapisać — stan uwagi NIE został zmieniony."
+    return None
+
+
 def _przed_tura(platform: str = "", sender_id: str = "", **_):
     try:
         if platform == "telegram":
@@ -147,5 +178,7 @@ def register(ctx):
     ctx.register_hook("pre_llm_call", _przed_tura)
     ctx.register_hook("post_llm_call", _po_turze)
     ctx.register_command("stan", _komenda_stan, description="Bibo: jak się dziś czujesz (siatka stanu)")
+    ctx.register_command("fokus", _komenda_fokus, description="Bibo: stan uwagi (rozproszony / norma / hiperfokus)",
+                         args_hint="[rozproszony|norma|hiperfokus]")
     ctx.register_command("bt_diag", _komenda_diagnostyka, description="Bibotektyw: diagnostyka wtyczki")
     uslugi.uruchom_gdy_gateway()

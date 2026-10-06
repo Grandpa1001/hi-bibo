@@ -73,6 +73,13 @@ CREATE TABLE IF NOT EXISTS siatka_pokazana (
     dzien TEXT NOT NULL,
     PRIMARY KEY (wlasciciel, dzien)
 );
+CREATE TABLE IF NOT EXISTS przypomnienia_uwagi (
+    wlasciciel TEXT NOT NULL,
+    dzien TEXT NOT NULL,
+    ostatnie TEXT NOT NULL,
+    liczba INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (wlasciciel, dzien)
+);
 CREATE TABLE IF NOT EXISTS aktywnosc (
     wlasciciel TEXT NOT NULL,
     dzien TEXT NOT NULL,
@@ -88,6 +95,8 @@ _gotowe: set[str] = set()   # bazy ze świeżo sprawdzonym schematem: nie powtar
 DNI_POKAZU = 14
 PRZERWA_SESJI_MIN = 30       # dłuższa przerwa między turami zaczyna nową sesję
 DNI_AKTYWNOSCI = 60
+PRZYPOMNIENIE_CO_MIN = 90      # FR-14: w hiperfokusie najwyżej jedno przypomnienie na 90 min
+MAKS_PRZYPOMNIEN = 6           # dziennie; twardy bezpiecznik, żeby nie zasypać
 
 
 class BladStanu(Exception):
@@ -329,6 +338,40 @@ def zaangazowanie(w: str, *, teraz: datetime | None = None, sciezka: Path | None
                      if datetime.fromisoformat(k["zaktualizowano"]).astimezone(z).date() == dzien)
     return {"dzien": dzien.isoformat(), "tury": r["tury"] if r else 0, "sesje": r["sesje"] if r else 0,
             "minuty": (r["sekundy"] // 60) if r else 0, "domkniecia": domkniecia}
+
+
+def zajmij_przypomnienie(w: str, *, wstrzymane: bool = False, teraz: datetime | None = None,
+                         sciezka: Path | None = None) -> bool:
+    """FR-14 (hiperfokus): atomowo „bierze” przypomnienie o przerwie i zwraca True, gdy trzeba je wysłać.
+    Warunki: dziś ostatni wpis ma uwagę hyperfocus, od niego i od poprzedniego przypomnienia minęło
+    ≥ PRZYPOMNIENIE_CO_MIN, a dzienny limit nie wyczerpany. Zajęcie następuje PRZED wysyłką, więc
+    awaria wysyłki nie powoduje powtórki. `wstrzymane` (pauza/cisza) zużywa termin bez wysyłki i bez
+    liczenia do limitu: zaległe przypomnienie nie wychodzi po końcu ciszy."""
+    w = _wymagaj_wlasciciela(w)
+    teraz = teraz or kontakt.teraz()
+    dzien = teraz.astimezone(kontakt.strefa()).date().isoformat()
+    with closing(_polacz(sciezka)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            e = _ostatni_dzis(db, w, teraz)
+            wyslac = False
+            if e and e["uwaga"] == "hyperfocus":
+                r = db.execute("SELECT * FROM przypomnienia_uwagi WHERE wlasciciel=? AND dzien=?", (w, dzien)).fetchone()
+                baza = datetime.fromisoformat(e["utworzono"])
+                if r:
+                    baza = max(baza, datetime.fromisoformat(r["ostatnie"]))
+                if teraz - baza >= timedelta(minutes=PRZYPOMNIENIE_CO_MIN) and not (r and r["liczba"] >= MAKS_PRZYPOMNIEN):
+                    wyslac = not wstrzymane
+                    db.execute("INSERT INTO przypomnienia_uwagi (wlasciciel, dzien, ostatnie, liczba) VALUES (?,?,?,?) "
+                               "ON CONFLICT(wlasciciel, dzien) DO UPDATE SET ostatnie=excluded.ostatnie, liczba=liczba+excluded.liczba",
+                               (w, dzien, _utc(teraz), int(wyslac)))
+                    db.execute("DELETE FROM przypomnienia_uwagi WHERE dzien<?",
+                               ((teraz.astimezone(kontakt.strefa()).date() - timedelta(days=DNI_POKAZU)).isoformat(),))
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+    return wyslac
 
 
 # --- sygnały gorszego dnia / uwagi ------------------------------------------------

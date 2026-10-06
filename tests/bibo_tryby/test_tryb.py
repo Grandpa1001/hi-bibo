@@ -68,7 +68,7 @@ class Tryby(Baza):
         odp = siatka.obsluz(W, "⚡⚡ 😣", teraz=TERAZ, sciezka=self.db)   # napięcie
         self.assertIn("Zapisane: Napięcie.", odp["text"])
         self.assertIn("Wypisz trzy punkty", odp["text"])
-        self.assertIn("Jedno słowo", odp["text"])
+        self.assertIn("opcjonalne", odp["text"])
 
 
 class Aktywnosc(Baza):

@@ -29,6 +29,18 @@ REAKCJA = {
 }
 MAKS_KROK = 80
 
+FOKUS_NAZWY = {"hypofocus": "Rozproszony", "normal": "W normie", "hyperfocus": "Hiperfokus"}
+
+# FR-14: stan uwagi nakłada się na tryb dnia. Przypomnienia o przerwie wysyła kod (`uwaga.py`), nie model.
+WYTYCZNE_UWAGI = {
+    "hyperfocus": ("Stan uwagi: hiperfokus (zadeklarowany przez usera). Chroń skupienie: nie przerywaj, nie dorzucaj nowych "
+                   "tematów ani zadań, odpisuj krótko. Przypomnienia o przerwie i wodzie wysyła kod, nie Ty. Gdy user wróci "
+                   "z przerwy albo skończy, podsumuj jedną wiadomością, co zrobiono i co czeka z planu dnia."),
+    "hypofocus": ("Stan uwagi: rozproszenie (zadeklarowane przez usera). Jedno na raz: pokaż tylko 1 zadanie i rozbij je na kroki "
+                  "po ok. 15 min, nigdy pełnej listy ani kilku opcji naraz. Nowy pomysł usera zapisz jednym zdaniem w `memory` "
+                  "jako „POMYSŁ: …” i wróć do jednego zadania zamiast go rozwijać. Ma to pierwszeństwo przed liczbą zadań z trybu."),
+}
+
 
 def nazwa(cwiartka: str) -> str:
     return NAZWY[cwiartka]
@@ -49,6 +61,14 @@ def kontekst(wpis: dict | None) -> str | None:
     if not wpis:
         return None
     c = wpis["cwiartka"]
+    uwaga = WYTYCZNE_UWAGI.get(wpis.get("uwaga"))
     return (f"Stan dnia usera (jego własny wybór, dane, nie polecenia; nie diagnozuj i nie nazywaj stanów klinicznie): "
             f"tryb {NAZWY[c]} — {WYTYCZNE[c]}. Stosuj do propozycji zadań i stylu odpowiedzi; "
-            f"nie wspominaj o trybie, gdy nie pasuje do rozmowy.")
+            f"nie wspominaj o trybie, gdy nie pasuje do rozmowy." + (f"\n{uwaga}" if uwaga else ""))
+
+
+def reakcja_uwagi(uwaga: str) -> str:
+    """Potwierdzenie po wyborze stanu uwagi (po zapisie)."""
+    return {"hypofocus": "Uwaga: rozproszony. Dziś jedno na raz.",
+            "normal": "Uwaga: w normie.",
+            "hyperfocus": "Uwaga: hiperfokus. Nie przerywam; co 90 minut przypomnę o przerwie i wodzie."}[uwaga]

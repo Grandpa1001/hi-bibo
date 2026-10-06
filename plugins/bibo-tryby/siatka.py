@@ -16,7 +16,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from . import karta, magazyn, stan, tryb
+from . import karta, magazyn, stan, tryb, uwaga
 
 log = logging.getLogger("bibo-tryby")
 
@@ -25,6 +25,7 @@ PRZYJEMNOSC = {-2: "😣", -1: "🙁", 1: "🙂", 2: "😄"}
 PRZYCISK_POMIN = "⏭ Pomiń"
 PREFIKS_SLOWA = "💭 "
 PREFIKS_NOTATKI = "notatka:"
+FOKUS = {"🌫 Rozproszony": "hypofocus", "👌 W normie": "normal", "🎯 Hiperfokus": "hyperfocus"}
 
 WIERSZE = (2, 1, -1, -2)
 KOLUMNY = (-2, -1, 1, 2)
@@ -48,9 +49,19 @@ def siatka() -> dict:
     return {"text": TEKST_SIATKI, "reply_markup": klawiatura_siatki()}
 
 
-def _klawiatura_slow(cwiartka: str) -> dict:
+def _wiersz_uwagi() -> list[dict]:
+    return [{"text": t} for t in FOKUS]
+
+
+def klawiatura_uwagi() -> dict:
+    """Sam rząd stanu uwagi (komenda `/fokus`)."""
+    return {"keyboard": [_wiersz_uwagi()], "one_time_keyboard": True, "resize_keyboard": True}
+
+
+def _klawiatura_po_wpisie(cwiartka: str) -> dict:
+    """FR-2 + FR-11: słowa z ćwiartki, „Pomiń” i jeden rząd stanu uwagi. Brak wyboru = W normie."""
     rzad = [{"text": PREFIKS_SLOWA + s} for s in stan.SLOWA[cwiartka]] + [{"text": PRZYCISK_POMIN}]
-    return {"keyboard": [rzad[i:i + 2] for i in range(0, len(rzad), 2)],
+    return {"keyboard": [rzad[i:i + 2] for i in range(0, len(rzad), 2)] + [_wiersz_uwagi()],
             "one_time_keyboard": True, "resize_keyboard": True}
 
 
@@ -68,13 +79,13 @@ def _po_tapnieciu(w: str, e: int, p: int, teraz, sciezka) -> dict:
     except Exception:
         a = None   # reakcja bez kroku z karty jest lepsza niż brak reakcji
     return _odp(f"Zapisane: {tryb.nazwa(r['cwiartka'])}. {tryb.reakcja(r['cwiartka'], a and a['krok'])}\n\n"
-                "Jedno słowo, jeśli chcesz — albo pomiń.", _klawiatura_slow(r["cwiartka"]))
+                "Słowo i stan uwagi są opcjonalne — bez wyboru zostaje „W normie”.", _klawiatura_po_wpisie(r["cwiartka"]))
 
 
 def rozpoznaj(tekst: str) -> bool:
     """Szybka bramka bez bazy: czy to w ogóle może być wiadomość z klawiatury stanu."""
     t = (tekst or "").strip()
-    return t in POLA or t in SLOWA or t == PRZYCISK_POMIN or t.lower().startswith(PREFIKS_NOTATKI)
+    return t in POLA or t in SLOWA or t in FOKUS or t == PRZYCISK_POMIN or t.lower().startswith(PREFIKS_NOTATKI)
 
 
 def obsluz(w: str, tekst: str, *, teraz: datetime | None = None, sciezka: Path | None = None) -> dict | None:
@@ -84,6 +95,8 @@ def obsluz(w: str, tekst: str, *, teraz: datetime | None = None, sciezka: Path |
     try:
         if t in POLA:
             return _po_tapnieciu(w, *POLA[t], teraz, sciezka)
+        if t in FOKUS:
+            return _odp(uwaga.wybierz(w, FOKUS[t], teraz=teraz, sciezka=sciezka))
         if t == PRZYCISK_POMIN:
             if stan.dzisiejszy(w, teraz=teraz, sciezka=sciezka) is None:
                 return None

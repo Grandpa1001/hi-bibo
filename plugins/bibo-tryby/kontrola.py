@@ -1,6 +1,7 @@
 """Pętla kontroli terminów (§A): co 60 s czyta sprawy.json, wysyła kontrolę
 po sprawach, których termin minął. Przeżywa restart — termin jest w pliku.
-Ta sama pętla obsługuje też check-iny karty sprawy (`checkin.sprawdz`); kontrola
+Ta sama pętla obsługuje też check-iny karty sprawy (`checkin.sprawdz`) i przypomnienia
+o przerwie w hiperfokusie (`uwaga.sprawdz`); kontrola
 minigry i check-in dotyczą różnych rekordów, więc nic nie jest obsługiwane dwa razy.
 Obie ścieżki respektują bramkę kontaktu (pauza, cisza): zaległa wiadomość nie
 wychodzi po jej zakończeniu, tylko jest pomijana.
@@ -11,7 +12,7 @@ import asyncio
 import logging
 from datetime import datetime
 
-from . import checkin, czat, kontakt, magazyn
+from . import checkin, czat, kontakt, magazyn, uwaga
 
 log = logging.getLogger("bibo-tryby")
 
@@ -61,4 +62,8 @@ async def petla(uslugi) -> None:
             await checkin.sprawdz(uslugi)
         except Exception:
             log.exception("bibo-tryby: pętla check-inów")
+        try:
+            await uwaga.sprawdz(uslugi)
+        except Exception:
+            log.exception("bibo-tryby: pętla przypomnień uwagi")
         await asyncio.sleep(INTERWAL_S)

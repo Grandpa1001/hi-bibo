@@ -23,6 +23,22 @@ Nic nie diagnozuje: nazywa tryb dnia, nie stan zdrowia.
 Tryb to ćwiartka ostatniego dzisiejszego wpisu. Do kontekstu każdej tury trafiają dwie krótkie linie wytycznych,
 tylko dla właściciela i tylko gdy dziś jest wpis.
 
+## Stan uwagi
+
+Uwaga to osobna oś od nastroju. Po stuknięciu w siatkę klawiatura ma jeden rząd: 🌫 Rozproszony · 👌 W normie · 🎯 Hiperfokus.
+Bez wyboru zostaje „W normie”. W ciągu dnia: `/fokus` (przyciski) albo `/fokus hiper`, `/fokus rozproszony`, `/fokus norma`.
+Zmiana uwagi dodaje nowy wpis z tymi samymi osiami, więc tryb dnia się nie zmienia.
+
+| Stan uwagi | Bibo robi | Bibo nie robi |
+| --- | --- | --- |
+| Hiperfokus | nie przerywa; co 90 min jedno krótkie przypomnienie o przerwie i wodzie (najwyżej 6 dziennie) | nie dorzuca tematów ani zadań |
+| W normie | zachowanie wg trybu dnia | – |
+| Rozproszony | pokazuje 1 zadanie, kroki po ok. 15 min; nowe pomysły zapisuje jako „POMYSŁ:” w pamięci | nie pokazuje listy ani kilku opcji |
+
+Przypomnienia wysyła kod (bez modelu) w istniejącej pętli co 60 s i respektują pauzę oraz ciszę nocną: przypomnienie z czasu ciszy
+przepada, nie wychodzi po jej końcu. Po wyjściu z hiperfokusu Bibo w jednej wiadomości mówi, co ma zapisane (zakończone sprawy dziś)
+i co czeka w karcie. Planu dnia spoza karty ta instancja nie ma, więc go nie zgaduje.
+
 ## Zaangażowanie w tle
 
 Zaangażowania nie pytamy. Bibo zapisuje wyłącznie znaczniki czasu tur (liczba tur, sesje przedzielone przerwą
