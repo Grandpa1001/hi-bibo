@@ -34,7 +34,7 @@ cd hi-bibo
 Then message your bot.
 
 **Updating:** `hermes bibo update` fetches the latest version from GitHub (no git needed; does nothing if you are up to date, `--force` reinstalls), installs
-`SOUL.md`, scripts, plugins and the Mini App, then restarts Bibo. It never touches `.env`, config,
+`SOUL.md`, scripts, and plugins, then restarts Bibo. It never touches `.env`, config,
 memory or cron jobs. `hermes bibo version` shows what's installed. On installs older than this command,
 run it once as `curl -fsSL https://raw.githubusercontent.com/Grandpa1001/hi-bibo/main/update.sh | bash`.
 
@@ -51,11 +51,10 @@ It does not work on Pro at all.
 and per proactive nudge, a timeline of memory writes, and its support plan (`--opinia` asks Bibo for a full
 opinion with one model call).
 
-**Bibo Mini App (day state):** optional plugin `bibo-tryby` puts a „Bibo” button next to your
-Telegram input. It opens a Mini App with a **Today** tab (a one-tap day-state check-in and a 7-day widget).
-Runs on your own bot over a free Cloudflare quick tunnel (no domain, no account), data stays in `~/.hermes/local/bibo_tryby/`.
-Enable it in `./install.sh` (answer „T” in the Modes section) or with `hermes bibo update`; disable it
-with `hermes plugins disable bibo-tryby`.
+**Day state (in chat):** optional plugin `bibo-tryby` adds a one-tap day-state check-in (`/stan`), attention
+state (`/fokus`), a one-case card with check-ins, and a weekly summary (`/tydzien`). Everything happens in the
+Telegram chat; data stays in `~/.hermes/local/bibo_tryby/`. Enable it in `./install.sh` (answer „T”) or with
+`hermes bibo update`; disable it with `hermes plugins disable bibo-tryby`. (The former Mini App was removed.)
 
 ## License
 

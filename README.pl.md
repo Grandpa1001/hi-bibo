@@ -74,16 +74,12 @@ hermes dashboard
 Na serwerze: `ssh -L 9119:127.0.0.1:9119 twój-serwer`, tam `hermes dashboard --no-open`,
 a u siebie otwórz http://127.0.0.1:9119.
 
-## Mini App Bibo (stan dnia)
+## Stan dnia w czacie
 
-Opcjonalna wtyczka `bibo-tryby` dokłada do czatu przycisk „Bibo” obok
-pola wiadomości. Otwiera Mini App z zakładką **Dziś** (stan dnia:
-widget z trybem, stanem uwagi i 7 ostatnimi dniami, opis w
-[docs/STAN.md](docs/STAN.md)).
+Opcjonalna wtyczka `bibo-tryby` daje w czacie: siatkę stanu dnia (`/stan`), stan uwagi (`/fokus`),
+kartę jednej sprawy z check-inami i podsumowanie tygodnia (`/tydzien`). Opis w [docs/STAN.md](docs/STAN.md).
+Dawna Mini App (przycisk „Bibo” i tunel Cloudflare) została usunięta; po aktualizacji Bibo samo zdejmuje martwy przycisk menu.
 
-- **Dystrybucja:** własna instancja u Ciebie (własny bot → własny Hermes → wtyczka)
-- **HTTPS:** darmowy tunel Cloudflare (`cloudflared`), bez konta i domeny —
-  adres zmienia się po restarcie, wtyczka sama przestawia przycisk menu
 - **Dane:** `~/.hermes/local/bibo_tryby/` (przeżywa aktualizacje)
 - **Wyłączenie:** `hermes plugins disable bibo-tryby` → Bibo działa jak przedtem
 

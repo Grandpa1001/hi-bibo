@@ -28,8 +28,7 @@ for w in bibo-podpis bibo-cli bibo-zegar bibo-tryby; do
   rm -rf "$HOME_DIR/plugins/$w"
 done
 
-# Tryby: zatrzymaj cloudflared (dane w local/bibo_tryby/ zostają, jak pamięć).
-pkill -f "cloudflared tunnel" 2>/dev/null || true
+# Tryby: dane w local/bibo_tryby/ zostają, jak pamięć.
 echo "Dane trybów: $HOME_DIR/local/bibo_tryby/ — zostają."
 
 say "Tożsamość"

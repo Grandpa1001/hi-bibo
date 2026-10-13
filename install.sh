@@ -228,36 +228,17 @@ else
     && echo "Dzienny licznik zużycia (bibo-usage, 23:55, 0 tokenów) ✓"
 fi
 
-# --- 8. Tryby (Mini App) -----------------------------------------------------
-say "Tryby Bibo (Mini App ze stanem dnia)"
-echo "Działa przez darmowy tunel Cloudflare — bez domeny i bez konta."
+# --- 8. Tryby (stan dnia w czacie) -----------------------------------------
+say "Tryby Bibo (stan dnia, karta sprawy, uwaga)"
 if yes "Włączyć Tryby?"; then
-  # cloudflared do katalogu Hermesa (wolumen — przeżywa update kontenera)
-  if ! command -v cloudflared >/dev/null 2>&1 && [[ ! -x "$HOME_DIR/bin/cloudflared" ]]; then
-    A="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-    mkdir -p "$HOME_DIR/bin"
-    if curl -fsSL -o "$HOME_DIR/bin/cloudflared" \
-        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$A"; then
-      chmod +x "$HOME_DIR/bin/cloudflared"; fix_owner "$HOME_DIR/bin"
-      echo "cloudflared ($A) ✓"
-    else
-      rm -f "$HOME_DIR/bin/cloudflared"
-      echo "UWAGA: nie udało się pobrać cloudflared — dograj ręcznie do $HOME_DIR/bin/"
-    fi
-  else
-    echo "cloudflared: jest ✓"
-  fi
   rm -rf "$HOME_DIR/plugins/bibo-tryby"
   cp -r "$REPO/plugins/bibo-tryby" "$HOME_DIR/plugins/bibo-tryby"
-  if [[ -d "$REPO/miniapp/dist" ]]; then
-    cp -r "$REPO/miniapp/dist" "$HOME_DIR/plugins/bibo-tryby/static"
-  fi
   mkdir -p "$HOME_DIR/local/bibo_tryby"
   fix_owner "$HOME_DIR/plugins" "$HOME_DIR/local"
   hermes plugins enable bibo-tryby --no-allow-tool-override >/dev/null 2>&1 \
     && echo "Wtyczka bibo-tryby ✓" \
     || echo "UWAGA: włącz ręcznie: hermes plugins enable bibo-tryby"
-  echo "Po restarcie Bibo w Telegramie pojawi się przycisk „Bibo” obok pola wiadomości."
+  echo "Po restarcie: /stan pokaże siatkę stanu dnia, /tydzien podsumowanie tygodnia."
 else
   if hermes plugins list 2>/dev/null | grep -q '^bibo-tryby'; then
     hermes plugins disable bibo-tryby >/dev/null 2>&1 || true

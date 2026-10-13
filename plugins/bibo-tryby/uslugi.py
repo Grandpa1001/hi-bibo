@@ -1,6 +1,7 @@
-"""Wątek usług: własna pętla asyncio z serwerem API, tunelem i klientem Bot API.
+"""Wątek usług: własna pętla asyncio z klientem Bot API i pętlą terminów (`kontrola`).
 
 Pętla gatewaya Hermesa nie jest tu używana — awaria usług nie wpływa na Bibo.
+Nie ma serwera HTTP ani tunelu (usunięte w M1 1.3).
 """
 from __future__ import annotations
 
@@ -11,25 +12,22 @@ import threading
 import time
 
 import aiohttp
-from aiohttp import web
 
-from . import kontrola, magazyn, wystawienie
+from . import kontrola, magazyn
 from .telegram import BotApi, BladTelegrama
 
 log = logging.getLogger("bibo-tryby")
 
 NAZWA_WATKU = "bibo-tryby-uslugi"
+ZNACZNIK_MENU = "menu_zresetowane.json"
 
 
 class Uslugi:
     def __init__(self):
         self.ust = magazyn.ustawienia()
-        self.port = int(self.ust["port"])
         self.petla: asyncio.AbstractEventLoop | None = None
         self.http: aiohttp.ClientSession | None = None
         self.bot: BotApi | None = None
-        self.url: str | None = None
-        self.wystawienie = None
         self.start = time.time()
 
     # --- cykl życia ---------------------------------------------------------
@@ -47,34 +45,20 @@ class Uslugi:
     async def _main(self) -> None:
         self.http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
         self.bot = BotApi(self.http)
-        from . import api
-        app = web.Application(client_max_size=4096, middlewares=[api.bledy, _naglowki])
-        app["uslugi"] = self
-        api.trasy(app)
-        runner = web.AppRunner(app, access_log=None)
-        await runner.setup()
-        try:
-            await web.TCPSite(runner, "127.0.0.1", self.port).start()
-        except OSError as e:
-            log.warning("bibo-tryby: port %s zajęty (%s) — usługi nie startują", self.port, e)
-            await self.http.close()
-            return
-        log.info("bibo-tryby: API na 127.0.0.1:%s", self.port)
-        self.wystawienie = wystawienie.utworz(self.ust)
+        await self._zresetuj_menu()
         self._kontrola = asyncio.create_task(kontrola.petla(self))
-        await self.wystawienie.uruchom(self._nowy_adres)   # QuickTunnel: działa do końca procesu
         await asyncio.Event().wait()
 
-    async def _nowy_adres(self, url: str) -> None:
-        self.url = url
-        magazyn.zapisz("stan_tunelu.json", {"url": url, "od": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
-        from .api import API_GOTOWE
-        menu = url if API_GOTOWE else f"{url}/?mock=1"
+    async def _zresetuj_menu(self) -> None:
+        """Raz: po Mini App w Telegramie został przycisk „Bibo” z martwym adresem — wracamy do domyślnego menu."""
+        if magazyn.czytaj(ZNACZNIK_MENU):
+            return
         try:
-            await self.bot.ustaw_menu(menu)
-            log.info("bibo-tryby: przycisk menu → %s", menu)
+            await self.bot.zresetuj_menu()
+            magazyn.zapisz(ZNACZNIK_MENU, {"od": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
+            log.info("bibo-tryby: przycisk menu Mini App usunięty")
         except BladTelegrama as e:
-            log.warning("bibo-tryby: nie ustawiono przycisku menu: %s", e)
+            log.warning("bibo-tryby: nie zresetowano przycisku menu (spróbuję przy następnym starcie): %s", e)
 
     # --- pomocnicze dla hooków (wywoływane z innych wątków) ------------------
     def zleć(self, coro) -> None:
@@ -82,14 +66,6 @@ class Uslugi:
             asyncio.run_coroutine_threadsafe(coro, self.petla)
         else:
             coro.close()
-
-
-@web.middleware
-async def _naglowki(request, handler):
-    resp = await handler(request)
-    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
-    resp.headers.setdefault("Referrer-Policy", "no-referrer")
-    return resp
 
 
 # --- start tylko w procesie gatewaya ----------------------------------------

@@ -14,8 +14,6 @@ import aiohttp
 
 log = logging.getLogger("bibo-tryby")
 
-EFEKT_KONFETTI = "5046509860389126442"   # 🎉 (message_effect_id, tylko czaty prywatne)
-
 
 def token() -> str:
     return os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
@@ -51,37 +49,6 @@ class BotApi:
             raise BladTelegrama(f"{metoda}: {odp.get('error_code')} {odp.get('description')}", odp.get("error_code"))
         return odp["result"]
 
-    async def ustaw_menu(self, url: str, tekst: str = "Bibo") -> None:
-        """Przycisk menu dla wszystkich czatów prywatnych bota."""
-        await self.wywolaj("setChatMenuButton", {
-            "menu_button": {"type": "web_app", "text": tekst, "web_app": {"url": url}}})
-
-    async def menu(self) -> dict:
-        return await self.wywolaj("getChatMenuButton", {})
-
-    async def wiadomosc_z_aplikacja(self, chat_id: str, tekst: str, przycisk: str, url: str,
-                                    styl: str | None = "success") -> dict:
-        btn = {"text": przycisk, "web_app": {"url": url}}
-        if styl:
-            btn["style"] = styl
-        dane = {"chat_id": chat_id, "text": tekst, "parse_mode": "HTML",
-                "reply_markup": {"inline_keyboard": [[btn]]}}
-        try:
-            return await self.wywolaj("sendMessage", dane)
-        except BladTelegrama as e:
-            if styl and "style" in str(e).lower():
-                btn.pop("style", None)
-                return await self.wywolaj("sendMessage", dane)
-            raise
-
-    async def karta(self, chat_id: str, zdjecie: str, podpis: str, efekt: str | None = EFEKT_KONFETTI) -> dict:
-        dane = {"chat_id": chat_id, "caption": podpis, "parse_mode": "HTML"}
-        if efekt:
-            dane["message_effect_id"] = efekt
-        try:
-            return await self.wywolaj("sendPhoto", dane, pliki={"photo": zdjecie})
-        except BladTelegrama as e:
-            if efekt and "effect" in str(e).lower():
-                dane.pop("message_effect_id", None)
-                return await self.wywolaj("sendPhoto", dane, pliki={"photo": zdjecie})
-            raise
+    async def zresetuj_menu(self) -> None:
+        """Przycisk menu czatów prywatnych z powrotem na domyślny (zdejmuje dawny przycisk Mini App)."""
+        await self.wywolaj("setChatMenuButton", {"menu_button": {"type": "default"}})

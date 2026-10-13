@@ -5,7 +5,7 @@ Wszystko z danych, które Bibo już ma, bez modelu i bez nowych pytań do usera:
 - wnioski opisują, co było w danych, a nie dlaczego: nie sugerują przyczyny i znikają, gdy danych jest za mało;
 - „domknięcia” to karty spraw zakończone w danym dniu (issues z zewnętrznych narzędzi ta instancja nie widzi);
 - raz w tygodniu ISO podsumowanie samo wychodzi po pierwszej okazji (z opóźnieniem, nigdy jako osobne przypomnienie)
-  i trafia do Kroniki; `/tydzien` pokazuje je na żądanie, a Mini App to samo okno liczy na żywo.
+  i trafia do Kroniki; `/tydzien` pokazuje je na żądanie.
 """
 from __future__ import annotations
 

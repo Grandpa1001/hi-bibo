@@ -2,14 +2,13 @@
 
     hermes bibo update    — pobiera i uruchamia update.sh z GitHuba (nic nie robi, gdy wersja aktualna)
     hermes bibo update --force — wgrywa ponownie, nawet gdy wersja aktualna
-    hermes bibo version   — wersje wgranych wtyczek i adres Mini App
+    hermes bibo version   — wersje wgranych wtyczek
 
 Skrypt pobieramy z sieci, a nie z lokalnego repo, żeby aktualizacja działała
 także wtedy, gdy repo na serwerze zniknęło albo jest stare.
 """
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -47,11 +46,6 @@ def _wersja(args) -> int:
                 if linia.startswith("version:"):
                     wersja = linia.split(":", 1)[1].strip().strip('"')
         print(f"{n:12} {wersja}")
-    try:
-        stan = json.loads((h / "local" / "bibo_tryby" / "stan_tunelu.json").read_text(encoding="utf-8"))
-        print(f"Mini App     {stan.get('url')}  (od {stan.get('od')})")
-    except Exception:
-        pass
     return 0
 
 
@@ -61,7 +55,7 @@ def _setup(parser) -> None:
     a.add_argument("--branch", dest="galaz", default="main", help="repo branch (default: main)")
     a.add_argument("--force", action="store_true", help="reinstall even if already up to date")
     a.set_defaults(bibo_func=_aktualizuj)
-    w = sub.add_parser("version", help="Installed Bibo plugin versions and Mini App URL")
+    w = sub.add_parser("version", help="Installed Bibo plugin versions")
     w.set_defaults(bibo_func=_wersja)
     parser.set_defaults(bibo_func=lambda a: (parser.print_help(), 0)[1])
 

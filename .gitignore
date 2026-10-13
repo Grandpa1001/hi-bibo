@@ -9,7 +9,4 @@ hermes-tutorial.pdf
 *.backup.*.json
 local/
 
-# Mini App
-miniapp/node_modules/
-plugins/bibo-tryby/static/
 docs/Analiza.md

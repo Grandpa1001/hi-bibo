@@ -7,8 +7,8 @@
 #
 # Nie potrzebuje gita. Sprawdza numer najnowszego commita na GitHubie — jeśli to
 # ta sama wersja, co wgrana, kończy bez pobierania. W przeciwnym razie pobiera
-# paczkę, wgrywa z niej pliki Bibo do katalogu Hermesa (SOUL.md, scripts/, wtyczki,
-# front Mini App) i restartuje Bibo. Kopię repo (~/hi-bibo) odświeża, jeśli może.
+# paczkę, wgrywa z niej pliki Bibo do katalogu Hermesa (SOUL.md, scripts/, wtyczki)
+# i restartuje Bibo. Kopię repo (~/hi-bibo) odświeża, jeśli może.
 # NIE rusza: .env, config.yaml, pamięci, historii, zadań cron, logowania.
 # Pierwsza instalacja i zmiana ustawień: ./install.sh
 set -euo pipefail
@@ -69,9 +69,6 @@ wgraj_wtyczke() {  # nazwa [tak = zainstaluj także, gdy jej jeszcze nie ma]
   [[ -d "$H/plugins/$n" || "${2:-}" == "tak" ]] || return 0
   rm -rf "$H/plugins/$n"
   cp -r "plugins/$n" "$H/plugins/$n"
-  if [[ "$n" == "bibo-tryby" && -d miniapp/dist ]]; then
-    cp -r miniapp/dist "$H/plugins/$n/static"
-  fi
   fix_owner "$H/plugins/$n"
   hermes plugins enable "$n" --no-allow-tool-override >/dev/null 2>&1 || true
   echo "wtyczka $n $(grep -m1 '^version' "plugins/$n/plugin.yaml" | cut -d'"' -f2) ✓"
@@ -80,13 +77,6 @@ wgraj_wtyczke bibo-podpis tak
 wgraj_wtyczke bibo-cli tak
 wgraj_wtyczke bibo-zegar tak
 wgraj_wtyczke bibo-tryby          # tylko jeśli tryby są już zainstalowane
-
-if [[ -d "$H/plugins/bibo-tryby" && ! -x "$H/bin/cloudflared" ]] && ! command -v cloudflared >/dev/null; then
-  A="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-  mkdir -p "$H/bin"
-  curl -fsSL -o "$H/bin/cloudflared" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$A"
-  chmod +x "$H/bin/cloudflared"; fix_owner "$H/bin"; echo "cloudflared ✓"
-fi
 
 # Kopia repo (install.sh, doctor.sh...) — odświeżana tylko, gdy mamy do niej prawo.
 if [[ "$ZRODLO" != "$REPO" ]]; then

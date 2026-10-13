@@ -8,8 +8,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DOMYSLNE_USTAWIENIA = {
-    "port": 8787,
-    "url_staly": None,          # gdy ustawiony — tunel się nie uruchamia
     "strefa": "Europe/Warsaw",
     "stan": True,               # wpisy stanu dnia (siatka w rozmowie); false = Bibo nic nie pokazuje ani nie przechwytuje
 }

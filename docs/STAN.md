@@ -11,13 +11,6 @@ Nic nie diagnozuje: nazywa tryb dnia, nie stan zdrowia.
   Notatkę dopiszesz wiadomością zaczynającą się od `notatka:`.
 - Zignorowana siatka tego dnia nie wraca i nie ma przypomnień.
 
-## Widget w Mini App
-
-Na zakładce „Dziś” w Mini App (przycisk „Bibo” obok pola wiadomości) widget pokazuje dzisiejszy tryb w kolorze ćwiartki, punkt na siatce,
-ikonę stanu uwagi i 7 ostatnich dni (kropka = ostatni wpis dnia, przerywana = brak wpisu). Stuknięcie otwiera siatkę
-4×4; po wpisie od razu widać reakcję Bibo i opcjonalne chipy uwagi oraz słowa. Wpisy z Mini App mają źródło `widget`.
-Tryb zawsze ma nazwę obok koloru. Widget nie pokazuje się, gdy `stan` jest wyłączony albo gdy profil nie ma jednego właściciela.
-
 ## Tryb dnia
 
 | Siatka | Tryb | Bibo proponuje | Duże decyzje | Styl |
@@ -86,8 +79,7 @@ Tryb dnia to ostatni wpis doby, a uwaga dnia — najmocniejszy stan zgłoszony t
 
 - **Kiedy wychodzi.** Okno to 7 pełnych dób do wczoraj, potrzebne są co najmniej 2 dni z wpisem. Bibo wysyła je przy pierwszej
   okazji: tuż po wpisie z siatki albo po zwykłej wiadomości, nigdy jako osobne przypomnienie. W dobie kryzysu nie wychodzi.
-- **`/tydzien`** pokazuje ostatnie 7 dni (z dzisiejszym) na żądanie, bez zapisu. W Mini App to samo okno widać w karcie „Twój tydzień”
-  na zakładce Dziś.
+- **`/tydzien`** pokazuje ostatnie 7 dni (z dzisiejszym) na żądanie, bez zapisu.
 - **Kronika.** Podsumowanie wysłane automatycznie zapisuje się w lokalnej Kronice (tabela `kronika` w `stan.sqlite3`), razem z danymi
   liczbowymi. Trafia do eksportu i znika przy usuwaniu danych. Zewnętrznych issues ta instancja nie widzi: „domknięcia” to karty spraw.
 

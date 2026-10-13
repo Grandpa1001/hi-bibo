@@ -1,21 +1,22 @@
-"""bibo-tryby — stan dnia, karta sprawy i uwaga Bibo w Telegramie (plus Mini App do czasu M1 1.3).
+"""bibo-tryby — stan dnia, karta sprawy i uwaga Bibo w Telegramie.
 
 Wtyczka dotyka Bibo w trzech miejscach, wszystkie opcjonalne:
 - `pre_gateway_dispatch` — zapamiętuje źródło rozmowy; jedyne, co przechwytuje, to
   stuknięcia w siatkę stanu dnia właściciela (`siatka.py`, bez udziału modelu); treści kryzysowe
   tylko uruchamiają numery pomocy (`kryzys.py`), a wiadomość dalej idzie do Bibo,
-- `pre_llm_call` — dokleja zaległą notatkę z Mini App (fallback) i krótkie
+- `pre_llm_call` — dokleja zaległą notatkę (fallback) i krótkie
   podsumowanie karty bieżącej sprawy oraz tryb dnia (`tryb.py`; przy okazji liczy turę
   do zaangażowania, same czasy bez treści),
 - `post_llm_call` — raz dziennie, po pierwszej turze, pokazuje siatkę stanu dnia (po przerwie
   oszacowanie); zbiera sygnały gorszego dnia i uwagi i zadaje najwyżej jedno pytanie Tak/Nie.
 
-Serwer API, tunel Cloudflare i Bot API żyją w osobnym wątku (`uslugi.py`),
-który startuje tylko w procesie gatewaya.
+Klient Bot API i pętla terminów (check-iny, przypomnienia uwagi) żyją w osobnym wątku
+(`uslugi.py`), który startuje tylko w procesie gatewaya.
 """
 from __future__ import annotations
 
 import logging
+import time
 
 from . import gateway_most, karta, karta_narzedzie, kontakt, kryzys, podsumowanie, prywatnosc, siatka, stan, sygnaly, tryb, uslugi, uwaga
 
@@ -272,9 +273,8 @@ def _komenda_diagnostyka(raw_args: str = "") -> str:
     d = gateway_most.diagnostyka()
     if u is None:
         return "bibo-tryby: usługi nie działają w tym procesie (czy gateway jest uruchomiony?)."
-    return (f"bibo-tryby {u.ust.get('port')} · tunel: {u.url or 'brak (sprawdź cloudflared)'}\n"
-            f"gateway: runner={d['runner']} pętla={d['petla']} telegram={d['adapter_telegram']}\n"
-            f"Otwórz Mini App przyciskiem „Bibo” obok pola wiadomości.")
+    return (f"bibo-tryby · usługi działają od {int(time.time() - u.start)} s\n"
+            f"gateway: runner={d['runner']} pętla={d['petla']} telegram={d['adapter_telegram']}")
 
 
 def register(ctx):

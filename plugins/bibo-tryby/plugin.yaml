@@ -1,6 +1,6 @@
 name: bibo-tryby
-version: "0.12.0"
-description: "Tryby Bibo w Telegram Mini App (Bibotektyw). Serwer API i tunel Cloudflare w osobnym wątku gatewaya. Front Mini App z static/, diagnostyka pod /spike."
+version: "0.13.0"
+description: "Stan dnia, karta sprawy i uwaga Bibo w Telegramie. Klient Bot API i pętla terminów w osobnym wątku gatewaya."
 provides_hooks:
   - pre_gateway_dispatch
   - pre_llm_call
