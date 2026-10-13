@@ -296,10 +296,72 @@ def section_plan(mem: dict[str, str], ask_model: bool) -> None:
         tmp.rmdir()
 
 
+# ------------------------------------------------- e) duplikaty i puste
+DUBEL_OKNO_S = 600  # identyczna wiadomość tej samej roli w tej sesji w ciągu 10 min = dubel
+
+
+def anomalie(con, od_ts: float = 0.0) -> list[dict]:
+    """Puste wiadomości asystenta i identyczne wiadomości pod rząd. Zwraca: [{ts, sesja, rodzaj, rola, tekst}].
+
+    Hermes przy kompresji kontekstu kopiuje ogon rozmowy: oryginały dostają compacted=1, active=0,
+    a kopie (active=1) wracają z nowymi czasami. Dlatego:
+    - dubel liczymy tylko wśród wierszy aktywnych (oryginał po kompresji nie jest już aktywny);
+    - pustą odpowiedź (koniec tury `stop`, bez tekstu i bez narzędzi) liczymy także wśród skompresowanych,
+      ale raz na wiadomość usera, na którą odpowiadała (kopia po kompresji to ta sama pusta odpowiedź).
+    Pomijamy `tool_calls` i `hidden` (wewnętrzne, nie idą do usera)."""
+    try:
+        rows = con.execute(
+            "SELECT m.id, m.session_id, m.role, m.content, m.tool_calls, m.timestamp, m.active, m.compacted, "
+            "m.finish_reason, m.display_kind "
+            "FROM messages m JOIN sessions s ON s.id = m.session_id "
+            "WHERE m.role IN ('user', 'assistant') AND m.timestamp >= ? "
+            "ORDER BY m.session_id, m.id", (od_ts,)).fetchall()
+    except sqlite3.Error:
+        return []
+    out, ostatnia, puste, ost_user = [], {}, set(), {}
+    for r in rows:
+        tekst = (r["content"] or "").strip()
+        base = {"ts": r["timestamp"], "sesja": r["session_id"], "rola": r["role"], "tekst": tekst[:80]}
+        if r["role"] == "user":
+            ost_user[r["session_id"]] = tekst
+        if (r["role"] == "assistant" and not tekst and not (r["tool_calls"] or "").strip("[] ")
+                and r["finish_reason"] == "stop" and r["display_kind"] != "hidden"):
+            klucz = (r["session_id"], ost_user.get(r["session_id"]))
+            if klucz not in puste:
+                puste.add(klucz)
+                out.append({**base, "rodzaj": "pusta"})
+            continue
+        if not tekst or not r["active"]:
+            continue
+        prev = ostatnia.get((r["session_id"], r["role"]))
+        if prev and prev[0] == tekst and r["timestamp"] - prev[1] <= DUBEL_OKNO_S:
+            out.append({**base, "rodzaj": "dubel"})
+        ostatnia[(r["session_id"], r["role"])] = (tekst, r["timestamp"])
+    return out
+
+
+def section_anomalie(con, days: int) -> None:
+    h("e) Duplikaty i puste wiadomości")
+    od = (datetime.now() - timedelta(days=days)).replace(hour=0, minute=0, second=0).timestamp()
+    found = anomalie(con, od)
+    if not found:
+        print(f"Ostatnie {days} dni: czysto (0 pustych, 0 dubli).")
+        return
+    per_day = defaultdict(lambda: defaultdict(int))
+    for a in found:
+        per_day[day(a["ts"])][f"{a['rodzaj']} {a['rola']}"] += 1
+    for d, c in sorted(per_day.items()):
+        print(f"  {d}  " + ", ".join(f"{k}: {v}" for k, v in sorted(c.items())))
+    print("\nOstatnie przypadki:")
+    for a in found[-8:]:
+        print(f"  {datetime.fromtimestamp(a['ts']):%m-%d %H:%M} {a['rodzaj']:<5} {a['rola']:<9} {a['sesja'][:12]}  {a['tekst']!r}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Raport Bibo")
     ap.add_argument("--dni", type=int, default=7, help="okno zużycia dziennego (domyślnie 7)")
     ap.add_argument("--opinia", action="store_true", help="dopytaj Bibo o opinię i plan (1 wywołanie modelu)")
+    ap.add_argument("--anomalie", action="store_true", help="tylko duplikaty i puste wiadomości (z okna --dni)")
     ap.add_argument("--snapshot", action="store_true", help="tylko zapisz dzienne zdjęcie licznika (dla crona)")
     args = ap.parse_args()
 
@@ -311,11 +373,16 @@ def main() -> int:
         snapshot(usage_rows(con))
         return 0
 
+    if args.anomalie:
+        section_anomalie(con, args.dni)
+        return 0
+
     print(f"Raport Bibo — {datetime.now():%Y-%m-%d %H:%M} — {HOME}")
     mem = read_memory()
     section_data(mem)
     section_usage(con, args.dni)
     section_learning(con)
+    section_anomalie(con, args.dni)
     section_plan(mem, args.opinia)
     print()
     return 0
