@@ -74,24 +74,17 @@ hermes dashboard
 Na serwerze: `ssh -L 9119:127.0.0.1:9119 twój-serwer`, tam `hermes dashboard --no-open`,
 a u siebie otwórz http://127.0.0.1:9119.
 
-## Mini App Bibo (stan dnia i gry)
+## Mini App Bibo (stan dnia)
 
 Opcjonalna wtyczka `bibo-tryby` dokłada do czatu przycisk „Bibo” obok
-pola wiadomości. Otwiera Mini App z dwiema zakładkami: **Dziś** (stan dnia:
+pola wiadomości. Otwiera Mini App z zakładką **Dziś** (stan dnia:
 widget z trybem, stanem uwagi i 7 ostatnimi dniami, opis w
-[docs/STAN.md](docs/STAN.md)) i **Gry**. Pierwsza gra to **Bibotektyw**: bierzesz wymówkę,
-z której odkładasz zadanie, Bibo-detektyw przesłuchuje ją jak podejrzanego
-i wydaje werdykt („obalona” / „częściowo” / „uniewinniona”) plus jeden mały
-krok. Po zamknięciu akt Bibo pisze do Ciebie w czacie i po 10 min sprawdza,
-czy ruszyło.
+[docs/STAN.md](docs/STAN.md)).
 
 - **Dystrybucja:** własna instancja u Ciebie (własny bot → własny Hermes → wtyczka)
 - **HTTPS:** darmowy tunel Cloudflare (`cloudflared`), bez konta i domeny —
   adres zmienia się po restarcie, wtyczka sama przestawia przycisk menu
-- **Model:** 2 × `claude-haiku-4-5` na sprawę (~$0,002) + 1 × Sonnet na
-  komentarz Bibo — korzysta z Twojego logowania Hermesa
-- **Dane:** kartoteka w `~/.hermes/local/bibo_tryby/` (przeżywa aktualizacje);
-  wymówki idą do Anthropic w ramach zapytania, nie są zapisywane po stronie zewnętrznej
+- **Dane:** `~/.hermes/local/bibo_tryby/` (przeżywa aktualizacje)
 - **Wyłączenie:** `hermes plugins disable bibo-tryby` → Bibo działa jak przedtem
 
 Włączasz w `./install.sh` (odpowiedź „T” w sekcji Tryby); ponownie:

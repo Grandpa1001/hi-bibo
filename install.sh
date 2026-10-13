@@ -229,7 +229,7 @@ else
 fi
 
 # --- 8. Tryby (Mini App) -----------------------------------------------------
-say "Tryby Bibo (Mini App z grą Bibotektyw)"
+say "Tryby Bibo (Mini App ze stanem dnia)"
 echo "Działa przez darmowy tunel Cloudflare — bez domeny i bez konta."
 if yes "Włączyć Tryby?"; then
   # cloudflared do katalogu Hermesa (wolumen — przeżywa update kontenera)
@@ -261,7 +261,7 @@ if yes "Włączyć Tryby?"; then
 else
   if hermes plugins list 2>/dev/null | grep -q '^bibo-tryby'; then
     hermes plugins disable bibo-tryby >/dev/null 2>&1 || true
-    echo "Tryby wyłączone. Dane (kartoteka) zostają w $HOME_DIR/local/bibo_tryby/."
+    echo "Tryby wyłączone. Dane zostają w $HOME_DIR/local/bibo_tryby/."
   fi
 fi
 

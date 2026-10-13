@@ -8,22 +8,22 @@ from _ladowanie import wtyczka  # noqa: E402
 podpis = wtyczka("bibo-podpis")
 
 
-class Znaczniki(unittest.TestCase):
-    def test_usuwa_znacznik_przed_podpisem(self):
-        self.assertEqual(podpis.sign("Która rzecz bardziej uwiera? [[tryb:detektyw]]", "telegram"),
-                         "Która rzecz bardziej uwiera? bibo")
-
-    def test_znacznik_w_nowej_linii(self):
-        self.assertEqual(podpis.sign("Ok.\n[[tryb:detektyw]]", "telegram"), "Ok. bibo")
-
-    def test_bez_znacznika_bez_zmian(self):
+class Podpis(unittest.TestCase):
+    def test_dokleja_podpis(self):
         self.assertEqual(podpis.sign("Cześć!", "telegram"), "Cześć! bibo")
 
-    def test_nie_rusza_zwyklych_nawiasow(self):
+    def test_nie_rusza_nawiasow(self):
         self.assertEqual(podpis.sign("Lista [[a]] zostaje", "telegram"), "Lista [[a]] zostaje bibo")
 
-    def test_poza_telegramem_nic(self):
-        self.assertIsNone(podpis.sign("tekst [[tryb:detektyw]]", "cli"))
+    def test_poza_telegramem_i_cronem_nic(self):
+        self.assertIsNone(podpis.sign("tekst", "cli"))
+
+    def test_cisza_i_pusty_tekst_bez_podpisu(self):
+        self.assertIsNone(podpis.sign("[SILENT]", "cron"))
+        self.assertIsNone(podpis.sign("   ", "telegram"))
+
+    def test_nie_dubluje_podpisu_modelu(self):
+        self.assertEqual(podpis.sign("Dasz radę, bibo", "telegram"), "Dasz radę bibo")
 
 
 if __name__ == "__main__":

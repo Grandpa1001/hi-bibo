@@ -30,7 +30,7 @@ done
 
 # Tryby: zatrzymaj cloudflared (dane w local/bibo_tryby/ zostają, jak pamięć).
 pkill -f "cloudflared tunnel" 2>/dev/null || true
-echo "Dane trybów (kartoteka): $HOME_DIR/local/bibo_tryby/ — zostają."
+echo "Dane trybów: $HOME_DIR/local/bibo_tryby/ — zostają."
 
 say "Tożsamość"
 last="$(ls -t "$HOME_DIR"/backups/SOUL-*.md 2>/dev/null | head -1 || true)"

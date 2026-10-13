@@ -1,4 +1,4 @@
-"""bibo-tryby — tryby Bibo w Telegram Mini App (Bibotektyw).
+"""bibo-tryby — stan dnia, karta sprawy i uwaga Bibo w Telegramie (plus Mini App do czasu M1 1.3).
 
 Wtyczka dotyka Bibo w trzech miejscach, wszystkie opcjonalne:
 - `pre_gateway_dispatch` — zapamiętuje źródło rozmowy; jedyne, co przechwytuje, to
@@ -8,10 +8,7 @@ Wtyczka dotyka Bibo w trzech miejscach, wszystkie opcjonalne:
   podsumowanie karty bieżącej sprawy oraz tryb dnia (`tryb.py`; przy okazji liczy turę
   do zaangażowania, same czasy bez treści),
 - `post_llm_call` — raz dziennie, po pierwszej turze, pokazuje siatkę stanu dnia (po przerwie
-  oszacowanie); zbiera sygnały gorszego dnia i uwagi i zadaje najwyżej jedno pytanie Tak/Nie;
-  wykrywa znacznik propozycji `[[tryb:detektyw]]`
-  (znacznik z tekstu usuwa `bibo-podpis`; `transform_llm_output` bierze tylko
-  pierwszą podmianę, więc nie konkurujemy z podpisem).
+  oszacowanie); zbiera sygnały gorszego dnia i uwagi i zadaje najwyżej jedno pytanie Tak/Nie.
 
 Serwer API, tunel Cloudflare i Bot API żyją w osobnym wątku (`uslugi.py`),
 który startuje tylko w procesie gatewaya.
@@ -20,10 +17,9 @@ from __future__ import annotations
 
 import logging
 
-from . import czat, gateway_most, karta, karta_narzedzie, kontakt, kryzys, podsumowanie, prywatnosc, siatka, stan, sygnaly, tryb, uslugi, uwaga
+from . import gateway_most, karta, karta_narzedzie, kontakt, kryzys, podsumowanie, prywatnosc, siatka, stan, sygnaly, tryb, uslugi, uwaga
 
 log = logging.getLogger("bibo-tryby")
-ZNACZNIK = "[[tryb:detektyw]]"
 _siatka_dzien: dict[str, object] = {}
 
 
@@ -269,17 +265,6 @@ def _po_turze(assistant_response: str = "", platform: str = "", user_message=Non
             _sygnaly_po_turze(platform, user_message)
     except Exception:
         log.debug("bibo-tryby: siatka i sygnały po turze", exc_info=True)
-    try:
-        if platform != "telegram" or ZNACZNIK not in (assistant_response or ""):
-            return
-        u = uslugi.aktywne()
-        uid = gateway_most.ostatni_user()
-        if u and uid:
-            u.zleć(czat.wyslij_propozycje(uid, u))
-        else:
-            log.info("bibo-tryby: znacznik propozycji wykryty, ale usługi/user niedostępne")
-    except Exception:
-        log.debug("bibo-tryby: post_llm_call", exc_info=True)
 
 
 def _komenda_diagnostyka(raw_args: str = "") -> str:
@@ -294,13 +279,6 @@ def _komenda_diagnostyka(raw_args: str = "") -> str:
 
 def register(ctx):
     try:
-        ctx.register_auxiliary_task(
-            "bibo_tryby", display_name="Bibo — tryby",
-            description="Krótkie wywołania gier Bibo (Bibotektyw): pytanie śledczego i werdykt.",
-            defaults={"provider": "anthropic", "model": "claude-haiku-4-5"})
-    except Exception as e:
-        log.warning("bibo-tryby: nie zarejestrowano zadania auxiliary: %s", e)
-    try:
         karta_narzedzie.zarejestruj(ctx)
     except Exception as e:
         log.warning("bibo-tryby: nie zarejestrowano narzędzia bibo_karta: %s", e)
@@ -314,5 +292,5 @@ def register(ctx):
                          args_hint="[potwierdzam]")
     ctx.register_command("fokus", _komenda_fokus, description="Bibo: stan uwagi (rozproszony / norma / hiperfokus)",
                          args_hint="[rozproszony|norma|hiperfokus]")
-    ctx.register_command("bt_diag", _komenda_diagnostyka, description="Bibotektyw: diagnostyka wtyczki")
+    ctx.register_command("bt_diag", _komenda_diagnostyka, description="Bibo: diagnostyka wtyczki")
     uslugi.uruchom_gdy_gateway()
